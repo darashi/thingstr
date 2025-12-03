@@ -33,8 +33,9 @@ export default function SearchBar({ className }: SearchBarProps) {
 			{hasQuery ? (
 				<div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-md bg-base-100 shadow-lg">
 					{isLoading ? (
-						<div className="px-4 py-3 text-sm text-base-content/70">
-							Searching...
+						<div className="flex items-center gap-2 px-4 py-3 text-sm text-base-content/70">
+							<span className="loading loading-spinner loading-sm text-primary" />
+							<span>Searching...</span>
 						</div>
 					) : results.length ? (
 						<ul className="max-h-[60vh] overflow-y-auto">
