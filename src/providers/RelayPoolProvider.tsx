@@ -1,10 +1,5 @@
 import type { ReactNode } from "react";
-import { createContext, useContext } from "react";
-import { RelayPool } from "applesauce-relay";
-
-const relayPool = new RelayPool();
-
-const RelayPoolContext = createContext<RelayPool | null>(null);
+import { RelayPoolContext, relayPool } from "./relayPoolContext";
 
 export function RelayPoolProvider({ children }: { children: ReactNode }) {
 	return (
@@ -12,12 +7,4 @@ export function RelayPoolProvider({ children }: { children: ReactNode }) {
 			{children}
 		</RelayPoolContext.Provider>
 	);
-}
-
-export function useRelayPool() {
-	const pool = useContext(RelayPoolContext);
-	if (!pool) {
-		throw new Error("RelayPoolProvider is missing in the component tree.");
-	}
-	return pool;
 }

@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 declare global {
 	interface Window {
 		nostr?: {
 			getPublicKey?: () => Promise<string>;
+			signEvent?: (event: unknown) => Promise<unknown>;
 		};
 	}
 }
@@ -28,29 +29,46 @@ const readStoredSession = (): Nip07Session | null => {
 	}
 };
 
+type SessionUpdater =
+	| Nip07Session
+	| null
+	| ((prev: Nip07Session | null) => Nip07Session | null);
+
+let currentSession: Nip07Session | null = readStoredSession();
+const subscribers = new Set<(value: Nip07Session | null) => void>();
+
+const notifySubscribers = () => {
+	subscribers.forEach((subscriber) => subscriber(currentSession));
+};
+
+const setSharedSession = (updater: SessionUpdater) => {
+	const nextSession =
+		typeof updater === "function" ? updater(currentSession) : updater;
+	currentSession = nextSession;
+	if (nextSession) {
+		localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+	} else {
+		localStorage.removeItem(AUTH_STORAGE_KEY);
+	}
+	notifySubscribers();
+};
+
+const subscribe = (listener: (value: Nip07Session | null) => void) => {
+	subscribers.add(listener);
+	return () => {
+		subscribers.delete(listener);
+	};
+};
+
 export function useNip07Auth() {
-	const [session, setSession] = useState<Nip07Session | null>(readStoredSession);
+	const [session, setSession] = useState<Nip07Session | null>(currentSession);
 	const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-	const updateSession = useCallback(
-		(
-			updater:
-				| Nip07Session
-				| null
-				| ((prev: Nip07Session | null) => Nip07Session | null),
-		) => {
-			setSession((prev) => {
-				const next = typeof updater === "function" ? updater(prev) : updater;
-				if (next) {
-					localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next));
-				} else {
-					localStorage.removeItem(AUTH_STORAGE_KEY);
-				}
-				return next;
-			});
-		},
-		[],
-	);
+	useEffect(() => subscribe(setSession), []);
+
+	const updateSession = useCallback((updater: SessionUpdater) => {
+		setSharedSession(updater);
+	}, []);
 
 	const login = useCallback(async () => {
 		if (isLoggingIn) return;

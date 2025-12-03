@@ -1,10 +1,5 @@
 import type { ReactNode } from "react";
-import { createContext, useContext } from "react";
-import { EventStore } from "applesauce-core";
-
-const eventStore = new EventStore();
-
-const EventStoreContext = createContext<EventStore | null>(null);
+import { EventStoreContext, eventStore } from "./eventStoreContext";
 
 export function EventStoreProvider({ children }: { children: ReactNode }) {
 	return (
@@ -12,12 +7,4 @@ export function EventStoreProvider({ children }: { children: ReactNode }) {
 			{children}
 		</EventStoreContext.Provider>
 	);
-}
-
-export function useEventStore() {
-	const store = useContext(EventStoreContext);
-	if (!store) {
-		throw new Error("EventStoreProvider is missing in the component tree.");
-	}
-	return store;
 }

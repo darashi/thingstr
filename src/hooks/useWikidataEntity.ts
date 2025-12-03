@@ -55,6 +55,7 @@ export interface WikidataEntityResult {
 	label: string | null;
 	description: string | null;
 	properties: EntityProperty[];
+	instanceOfIds: string[];
 	isLoading: boolean;
 	isPropertiesLoading: boolean;
 	error: string | null;
@@ -140,6 +141,23 @@ export function useWikidataEntity(
 
 	const claims = entityQuery.data?.claims ?? EMPTY_CLAIMS;
 
+	const instanceOfIds = useMemo(() => {
+		const statements = claims.P31 ?? [];
+		const ids = new Set<string>();
+
+		statements.forEach(({ mainsnak }) => {
+			const { datavalue } = mainsnak;
+			if (
+				datavalue?.type === "wikibase-entityid" &&
+				isWikibaseEntityValue(datavalue.value)
+			) {
+				ids.add(datavalue.value.id);
+			}
+		});
+
+		return Array.from(ids);
+	}, [claims]);
+
 	const labelIds = useMemo(() => {
 		const ids = new Set<string>(Object.keys(claims));
 
@@ -183,8 +201,18 @@ export function useWikidataEntity(
 		return Array.from(ids).sort();
 	}, [claims]);
 
-	const labelsQuery = useQuery<{ labelMap: LabelMap; descriptionMap: DescriptionMap }>({
-		queryKey: ["wikidata-labels", labelIds, language] as const,
+	const labelsQueryKey = useMemo(
+		() => ["wikidata-labels", labelIds, language] as const,
+		[labelIds, language],
+	);
+
+	const labelsQuery = useQuery<
+		{ labelMap: LabelMap; descriptionMap: DescriptionMap },
+		Error,
+		{ labelMap: LabelMap; descriptionMap: DescriptionMap },
+		typeof labelsQueryKey
+	>({
+		queryKey: labelsQueryKey,
 		enabled: Boolean(labelIds.length),
 		queryFn: async ({ queryKey, signal }) => {
 			const [, ids, languageCode] = queryKey;
@@ -315,6 +343,7 @@ export function useWikidataEntity(
 		error,
 		isLabelMissing,
 		isDescriptionMissing,
+		instanceOfIds,
 	};
 }
 

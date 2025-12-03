@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import {
 	RouterProvider,
@@ -14,8 +14,12 @@ import { useBrowserLanguage } from "./hooks/useBrowserLanguage";
 import { useWikidataEntity } from "./hooks/useWikidataEntity";
 import IdBadge from "./components/IdBadge";
 import EntityProperties from "./components/EntityProperties";
+import ReactionsCard from "./components/ReactionsCard";
+import WikidataReactionsList from "./components/WikidataReactionsList";
+import UserPage from "./components/UserPage";
 import { EventStoreProvider } from "./providers/EventStoreProvider";
 import { RelayPoolProvider } from "./providers/RelayPoolProvider";
+import { useThingstrReactionsSubscription } from "./hooks/useThingstrReactionsSubscription";
 
 const queryClient = new QueryClient();
 
@@ -26,7 +30,11 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
 	getParentRoute: () => rootRoute,
 	path: "/",
-	component: () => null,
+	component: () => (
+		<div className="space-y-4">
+			<WikidataReactionsList />
+		</div>
+	),
 });
 
 const thingRoute = createRoute({
@@ -45,9 +53,24 @@ const thingRoute = createRoute({
 			error,
 			isLabelMissing,
 			isDescriptionMissing,
+			instanceOfIds,
 		} = useWikidataEntity(id, {
 			language,
 		});
+
+		useEffect(() => {
+			const baseTitle = "thingstr";
+			const nextTitle = label
+				? `${label} | ${baseTitle}`
+				: !isLoading
+					? `${id} | ${baseTitle}`
+					: baseTitle;
+			document.title = nextTitle;
+			return () => {
+				document.title = baseTitle;
+			};
+		}, [id, isLoading, label]);
+
 		const showTitleSkeleton = isLoading;
 		const labelText = label ?? "No label defined";
 		const labelClassName = isLabelMissing ? "italic text-base-content/60" : "";
@@ -80,6 +103,8 @@ const thingRoute = createRoute({
 					</div>
 				</div>
 
+				<ReactionsCard entityId={id} instanceOfIds={instanceOfIds} />
+
 				{error ? null : (
 					<div className="card bg-base-100 shadow-sm rounded-md">
 						<div className="card-body py-4">
@@ -96,7 +121,16 @@ const thingRoute = createRoute({
 	},
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, thingRoute]);
+const profileRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "p/$npub",
+	component: function ProfilePage() {
+		const { npub } = profileRoute.useParams();
+		return <UserPage npub={npub} />;
+	},
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, thingRoute, profileRoute]);
 
 const router = createRouter({ routeTree });
 
@@ -106,10 +140,16 @@ declare module "@tanstack/react-router" {
 	}
 }
 
+function ThingstrRelayBootstrap() {
+	useThingstrReactionsSubscription();
+	return null;
+}
+
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
 		<RelayPoolProvider>
 			<EventStoreProvider>
+				<ThingstrRelayBootstrap />
 				<QueryClientProvider client={queryClient}>
 					<div className="bg-base-200 min-h-screen">
 						<RouterProvider router={router} />
