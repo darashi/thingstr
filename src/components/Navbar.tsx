@@ -1,4 +1,5 @@
 import { IconLogin, IconUser } from "@tabler/icons-react";
+import { Link } from "@tanstack/react-router";
 import SearchBar from "./SearchBar";
 import { useNip07Auth } from "../hooks/useNip07Auth";
 import { useProfile } from "../hooks/useProfile";
@@ -18,9 +19,9 @@ export default function Navbar() {
 		<div className="navbar bg-base-100 shadow-sm">
 			<div className="container mx-auto flex items-center gap-2">
 				<div className="flex-none">
-					<a href="/" className="btn btn-ghost text-xl">
+					<Link to="/" className="btn btn-ghost text-xl">
 						thingstr
-					</a>
+					</Link>
 				</div>
 				<div className="flex flex-1 items-center gap-2">
 					<SearchBar className="flex-1" />

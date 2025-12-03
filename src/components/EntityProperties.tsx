@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import IdBadge from "./IdBadge";
 import type { EntityProperty } from "../hooks/useWikidataEntity";
@@ -38,9 +39,10 @@ export default function EntityProperties({
 				? "text-primary underline underline-offset-4"
 				: "text-base-content/60 underline underline-offset-4 decoration-base-content/50";
 			const link = (
-				<a
+				<Link
 					className={linkClass}
-					href={`/things/${value.id}`}
+					to="/things/$id"
+					params={{ id: value.id }}
 				>
 					{value.label ? (
 						value.label
@@ -49,7 +51,7 @@ export default function EntityProperties({
 					) : (
 						<span className="skeleton inline-block h-4 w-32 align-middle" />
 					)}
-				</a>
+				</Link>
 			);
 			return (
 				<span className={`inline-flex flex-wrap items-center gap-2 ${textSize}`}>
@@ -129,12 +131,13 @@ export default function EntityProperties({
 					<div className="md:w-1/3 flex items-center gap-2">
 						{property.propertyLabel ? (
 							wrapWithTooltip(
-								<a
+								<Link
 									className="font-semibold"
-									href={`/things/${property.propertyId}`}
+									to="/things/$id"
+									params={{ id: property.propertyId }}
 								>
 									{property.propertyLabel}
-								</a>,
+								</Link>,
 								property.propertyDescription,
 							)
 						) : (
@@ -160,12 +163,13 @@ export default function EntityProperties({
 													>
 														{qualifier.propertyLabel ? (
 															wrapWithTooltip(
-																<a
+																<Link
 																	className="font-semibold uppercase tracking-[0.08em]"
-																	href={`/things/${qualifier.propertyId}`}
+																	to="/things/$id"
+																	params={{ id: qualifier.propertyId }}
 																>
 																	{qualifier.propertyLabel}
-																</a>,
+																</Link>,
 																qualifier.propertyDescription,
 															)
 														) : (

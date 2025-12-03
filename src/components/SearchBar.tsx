@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { IconSearch } from "@tabler/icons-react";
 import { useBrowserLanguage } from "../hooks/useBrowserLanguage";
@@ -41,9 +42,11 @@ export default function SearchBar({ className }: SearchBarProps) {
 						<ul className="max-h-[60vh] overflow-y-auto">
 							{results.map((item) => (
 								<li key={item.id}>
-									<a
+									<Link
 										className="flex flex-col gap-1 px-4 py-3 transition-colors hover:bg-base-200"
-										href={`/things/${item.id}`}
+										to="/things/$id"
+										params={{ id: item.id }}
+										onClick={() => setQuery("")}
 									>
 										<div className="flex items-center gap-2">
 											<span className="text-sm font-semibold">
@@ -56,7 +59,7 @@ export default function SearchBar({ className }: SearchBarProps) {
 												{item.description}
 											</span>
 										) : null}
-									</a>
+									</Link>
 								</li>
 							))}
 						</ul>
