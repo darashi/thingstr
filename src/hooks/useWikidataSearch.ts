@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 export interface WikidataSearchResult {
 	id: string;
@@ -12,9 +13,7 @@ interface WikidataSearchResponse {
 }
 
 interface UseWikidataSearchOptions {
-	debounceMs?: number;
 	language?: string;
-	limit?: number;
 }
 
 const ENDPOINT = "https://www.wikidata.org/w/api.php";
@@ -23,70 +22,48 @@ export function useWikidataSearch(
 	query: string,
 	options: UseWikidataSearchOptions = {},
 ) {
-	const { debounceMs = 250, language = "en", limit = 8 } = options;
-	const [results, setResults] = useState<WikidataSearchResult[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [debouncedQuery, setDebouncedQuery] = useState(query);
+	const { language = "en" } = options;
+	const trimmedQuery = useMemo(() => query.trim(), [query]);
 
-	useEffect(() => {
-		const timer = window.setTimeout(
-			() => setDebouncedQuery(query.trim()),
-			debounceMs,
-		);
-		return () => window.clearTimeout(timer);
-	}, [query, debounceMs]);
+	const searchQuery = useQuery({
+		queryKey: ["wikidata-search", trimmedQuery, language] as const,
+		enabled: Boolean(trimmedQuery),
+		queryFn: async ({ queryKey, signal }) => {
+			const [, searchTerm, languageCode] = queryKey;
 
-	useEffect(() => {
-		if (!debouncedQuery) {
-			setResults([]);
-			setError(null);
-			return;
-		}
+			const params = new URLSearchParams({
+				action: "wbsearchentities",
+				format: "json",
+				origin: "*",
+				language: languageCode,
+				uselang: languageCode,
+				search: searchTerm,
+			});
 
-		const controller = new AbortController();
+			const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
+				signal,
+			});
 
-		const runSearch = async () => {
-			setIsLoading(true);
-			setError(null);
-
-			try {
-				const params = new URLSearchParams({
-					action: "wbsearchentities",
-					format: "json",
-					origin: "*",
-					language,
-					uselang: language,
-					search: debouncedQuery,
-					limit: String(limit),
-				});
-
-				const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
-					signal: controller.signal,
-				});
-
-				if (!response.ok) {
-					throw new Error("Failed to search Wikidata");
-				}
-
-				const data = (await response.json()) as WikidataSearchResponse;
-				setResults(data.search ?? []);
-			} catch (err) {
-				if (controller.signal.aborted) {
-					return;
-				}
-
-				setResults([]);
-				setError(err instanceof Error ? err.message : "Unknown error");
-			} finally {
-				setIsLoading(false);
+			if (!response.ok) {
+				throw new Error("Failed to search Wikidata");
 			}
-		};
 
-		runSearch();
+			const data = (await response.json()) as WikidataSearchResponse;
+			return data.search ?? [];
+		},
+	});
 
-		return () => controller.abort();
-	}, [debouncedQuery, language, limit]);
+	const results = trimmedQuery ? searchQuery.data ?? [] : [];
+	const error = !trimmedQuery
+		? null
+		: searchQuery.error instanceof Error
+			? searchQuery.error.message
+			: searchQuery.error
+				? "Unknown error"
+				: null;
+	const isLoading = trimmedQuery
+		? searchQuery.isPending || searchQuery.isFetching
+		: false;
 
 	return { results, isLoading, error };
 }

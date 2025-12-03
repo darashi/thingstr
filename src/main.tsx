@@ -7,11 +7,14 @@ import {
 	createRouter,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import App from "./App";
 import { useBrowserLanguage } from "./hooks/useBrowserLanguage";
 import { useWikidataEntity } from "./hooks/useWikidataEntity";
 import IdBadge from "./components/IdBadge";
+
+const queryClient = new QueryClient();
 
 const rootRoute = createRootRoute({
 	component: App,
@@ -74,11 +77,13 @@ declare module "@tanstack/react-router" {
 
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		<div className="bg-base-200 min-h-screen">
-			<RouterProvider router={router} />
-			{import.meta.env.DEV ? (
-				<TanStackRouterDevtools router={router} initialIsOpen={false} />
-			) : null}
-		</div>
+		<QueryClientProvider client={queryClient}>
+			<div className="bg-base-200 min-h-screen">
+				<RouterProvider router={router} />
+				{import.meta.env.DEV ? (
+					<TanStackRouterDevtools router={router} initialIsOpen={false} />
+				) : null}
+			</div>
+		</QueryClientProvider>
 	</StrictMode>,
 );

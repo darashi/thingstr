@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 interface WikidataEntity {
 	labels?: Record<string, { value: string }>;
@@ -20,90 +21,78 @@ export function useWikidataEntity(
 	options: UseWikidataEntityOptions = {},
 ) {
 	const { language = "en" } = options;
-	const [label, setLabel] = useState<string | null>(null);
-	const [description, setDescription] = useState<string | null>(null);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const trimmedId = useMemo(() => id.trim(), [id]);
+	const missingIdMessage = useMemo(
+		() => (!trimmedId ? "Missing entity id" : null),
+		[trimmedId],
+	);
 
-	useEffect(() => {
-		if (!id) {
-			setLabel(null);
-			setDescription(null);
-			setError("Missing entity id");
-			return;
-		}
+	const entityQuery = useQuery({
+		queryKey: ["wikidata-entity", trimmedId, language] as const,
+		enabled: Boolean(trimmedId),
+		queryFn: async ({ queryKey, signal }) => {
+			const [, entityId, languageCode] = queryKey;
+			const languagesParam =
+				languageCode === "en" ? "en" : `${languageCode}|en`;
 
-		const controller = new AbortController();
+			const params = new URLSearchParams({
+				action: "wbgetentities",
+				format: "json",
+				ids: entityId,
+				origin: "*",
+				languages: languagesParam,
+				props: "labels|descriptions",
+			});
 
-		const fetchEntity = async () => {
-			setIsLoading(true);
-			setError(null);
+			const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
+				signal,
+			});
 
-			try {
-				const languagesParam =
-					language === "en" ? "en" : `${language}|en`;
-
-				const params = new URLSearchParams({
-					action: "wbgetentities",
-					format: "json",
-					ids: id,
-					origin: "*",
-					languages: languagesParam,
-					props: "labels|descriptions",
-				});
-
-				const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
-					signal: controller.signal,
-				});
-
-				if (!response.ok) {
-					throw new Error("Failed to load entity");
-				}
-
-				const data = (await response.json()) as WikidataEntityResponse;
-				const entity = data.entities?.[id];
-
-				if (!entity) {
-					throw new Error("Entity not found");
-				}
-
-				const labels = entity.labels ?? {};
-				const descriptions = entity.descriptions ?? {};
-
-				const pickValue = (
-					values: Record<string, { value: string }> | undefined,
-				): string | null => {
-					if (!values) return null;
-					return (
-						values[language]?.value ??
-						values.en?.value ??
-						Object.values(values)[0]?.value ??
-						null
-					);
-				};
-
-				const nextLabel = pickValue(labels);
-				const nextDescription = pickValue(descriptions);
-
-				setLabel(nextLabel);
-				setDescription(nextDescription);
-			} catch (err) {
-				if (controller.signal.aborted) {
-					return;
-				}
-
-				setLabel(null);
-				setDescription(null);
-				setError(err instanceof Error ? err.message : "Unknown error");
-			} finally {
-				setIsLoading(false);
+			if (!response.ok) {
+				throw new Error("Failed to load entity");
 			}
-		};
 
-		fetchEntity();
+			const data = (await response.json()) as WikidataEntityResponse;
+			const entity = data.entities?.[entityId];
 
-		return () => controller.abort();
-	}, [id, language]);
+			if (!entity) {
+				throw new Error("Entity not found");
+			}
+
+			const labels = entity.labels ?? {};
+			const descriptions = entity.descriptions ?? {};
+
+			const pickValue = (
+				values: Record<string, { value: string }> | undefined,
+			): string | null => {
+				if (!values) return null;
+				return (
+					values[languageCode]?.value ??
+					values.en?.value ??
+					Object.values(values)[0]?.value ??
+					null
+				);
+			};
+
+			return {
+				label: pickValue(labels),
+				description: pickValue(descriptions),
+			};
+		},
+	});
+
+	const label = entityQuery.data?.label ?? null;
+	const description = entityQuery.data?.description ?? null;
+	const isLoading = trimmedId
+		? entityQuery.isPending || entityQuery.isFetching
+		: false;
+	const error =
+		missingIdMessage ??
+		(entityQuery.error instanceof Error
+			? entityQuery.error.message
+			: entityQuery.error
+				? "Unknown error"
+				: null);
 
 	return { label, description, isLoading, error };
 }

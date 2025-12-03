@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { IconSearch } from "@tabler/icons-react";
 import { useBrowserLanguage } from "../hooks/useBrowserLanguage";
 import { useWikidataSearch } from "../hooks/useWikidataSearch";
@@ -11,8 +11,11 @@ interface SearchBarProps {
 export default function SearchBar({ className }: SearchBarProps) {
 	const language = useBrowserLanguage();
 	const [query, setQuery] = useState("");
+	const deferredQuery = useDeferredValue(query);
 	const hasQuery = useMemo(() => query.trim().length > 0, [query]);
-	const { results, isLoading, error } = useWikidataSearch(query, { language });
+	const { results, isLoading, error } = useWikidataSearch(deferredQuery, {
+		language,
+	});
 
 	return (
 		<div className={`relative ${className ?? ""}`}>
