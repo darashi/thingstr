@@ -14,6 +14,8 @@ import { useBrowserLanguage } from "./hooks/useBrowserLanguage";
 import { useWikidataEntity } from "./hooks/useWikidataEntity";
 import IdBadge from "./components/IdBadge";
 import EntityProperties from "./components/EntityProperties";
+import { EventStoreProvider } from "./providers/EventStoreProvider";
+import { RelayPoolProvider } from "./providers/RelayPoolProvider";
 
 const queryClient = new QueryClient();
 
@@ -106,13 +108,17 @@ declare module "@tanstack/react-router" {
 
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		<QueryClientProvider client={queryClient}>
-			<div className="bg-base-200 min-h-screen">
-				<RouterProvider router={router} />
-				{import.meta.env.DEV ? (
-					<TanStackRouterDevtools router={router} initialIsOpen={false} />
-				) : null}
-			</div>
-		</QueryClientProvider>
+		<RelayPoolProvider>
+			<EventStoreProvider>
+				<QueryClientProvider client={queryClient}>
+					<div className="bg-base-200 min-h-screen">
+						<RouterProvider router={router} />
+						{import.meta.env.DEV ? (
+							<TanStackRouterDevtools router={router} initialIsOpen={false} />
+						) : null}
+					</div>
+				</QueryClientProvider>
+			</EventStoreProvider>
+		</RelayPoolProvider>
 	</StrictMode>,
 );

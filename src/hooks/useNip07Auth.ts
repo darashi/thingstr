@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 declare global {
 	interface Window {
@@ -12,11 +12,45 @@ const AUTH_STORAGE_KEY = "thingstr.auth";
 
 interface Nip07Session {
 	pubkey: string;
+	picture?: string | null;
 }
 
+const readStoredSession = (): Nip07Session | null => {
+	try {
+		const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+		if (!stored) return null;
+		const parsed = JSON.parse(stored) as Nip07Session;
+		return parsed.pubkey ? parsed : null;
+	} catch (error) {
+		console.error("Failed to load auth state", error);
+		localStorage.removeItem(AUTH_STORAGE_KEY);
+		return null;
+	}
+};
+
 export function useNip07Auth() {
-	const [session, setSession] = useState<Nip07Session | null>(null);
+	const [session, setSession] = useState<Nip07Session | null>(readStoredSession);
 	const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+	const updateSession = useCallback(
+		(
+			updater:
+				| Nip07Session
+				| null
+				| ((prev: Nip07Session | null) => Nip07Session | null),
+		) => {
+			setSession((prev) => {
+				const next = typeof updater === "function" ? updater(prev) : updater;
+				if (next) {
+					localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next));
+				} else {
+					localStorage.removeItem(AUTH_STORAGE_KEY);
+				}
+				return next;
+			});
+		},
+		[],
+	);
 
 	const login = useCallback(async () => {
 		if (isLoggingIn) return;
@@ -27,40 +61,37 @@ export function useNip07Auth() {
 		try {
 			setIsLoggingIn(true);
 			const pubkey = await window.nostr.getPublicKey();
-			const nextSession = { pubkey };
-			setSession(nextSession);
-			localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+			const nextSession: Nip07Session = { pubkey };
+			updateSession(nextSession);
 		} catch (error) {
 			console.error("Failed to login with NIP-07", error);
 			window.alert("Failed to login with NIP-07.");
 		} finally {
 			setIsLoggingIn(false);
 		}
-	}, [isLoggingIn]);
+	}, [isLoggingIn, updateSession]);
 
 	const logout = useCallback(() => {
-		setSession(null);
-		localStorage.removeItem(AUTH_STORAGE_KEY);
-	}, []);
+		updateSession(null);
+	}, [updateSession]);
 
-	useEffect(() => {
-		try {
-			const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-			if (!stored) return;
-			const parsed = JSON.parse(stored) as { pubkey?: string };
-			if (parsed.pubkey) {
-				setSession({ pubkey: parsed.pubkey });
-			}
-		} catch (error) {
-			console.error("Failed to load auth state", error);
-			localStorage.removeItem(AUTH_STORAGE_KEY);
-		}
-	}, []);
+	const setProfilePicture = useCallback(
+		(picture: string | null | undefined) => {
+			updateSession((prev) => {
+				if (!prev) return prev;
+				const nextPicture = picture ?? null;
+				if (prev.picture === nextPicture) return prev;
+				return { ...prev, picture: nextPicture };
+			});
+		},
+		[updateSession],
+	);
 
 	return {
 		session,
 		isLoggingIn,
 		login,
 		logout,
+		setProfilePicture,
 	};
 }
