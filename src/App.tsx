@@ -6,7 +6,7 @@ function App() {
 	return (
 		<>
 			<Navbar />
-			<main className="container mx-auto px-4 py-6">
+			<main className="container mx-auto py-6">
 				<Outlet />
 			</main>
 		</>
