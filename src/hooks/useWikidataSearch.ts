@@ -38,6 +38,7 @@ export function useWikidataSearch(
 				language: languageCode,
 				uselang: languageCode,
 				search: searchTerm,
+				limit: "50",
 			});
 
 			const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
