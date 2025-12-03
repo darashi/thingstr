@@ -1,7 +1,17 @@
+import { useMemo } from "react";
 import { IconLogin } from "@tabler/icons-react";
 import SearchBar from "./SearchBar";
+import { useNip07Auth } from "../hooks/useNip07Auth";
 
 export default function Navbar() {
+	const { session, isLoggingIn, login, logout } = useNip07Auth();
+	const pubkey = session?.pubkey ?? null;
+
+	const avatarLabel = useMemo(() => {
+		if (!pubkey) return null;
+		return pubkey.slice(0, 2).toUpperCase();
+	}, [pubkey]);
+
 	return (
 		<div className="navbar bg-base-100 shadow-sm">
 			<div className="container mx-auto flex items-center gap-2">
@@ -12,32 +22,41 @@ export default function Navbar() {
 				</div>
 				<div className="flex flex-1 items-center gap-2">
 					<SearchBar className="flex-1" />
-					<div className="dropdown dropdown-end">
-						<div
-							tabIndex={0}
-							role="button"
-							className="btn btn-ghost btn-circle"
-						>
-							<IconLogin size={22} className="text-primary" />
+					{pubkey && avatarLabel ? (
+						<div className="dropdown dropdown-end">
+							<div tabIndex={0} role="button">
+								<div className="avatar">
+									<div className="w-10 rounded-full bg-primary/20 text-primary-content flex items-center justify-center font-semibold border border-transparent hover:bg-primary/20">
+										{avatarLabel}
+									</div>
+								</div>
+							</div>
+							<ul
+								tabIndex={0}
+								className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-44 p-2 shadow"
+							>
+								<li>
+									<button type="button" onClick={logout}>
+										Log out
+									</button>
+								</li>
+							</ul>
 						</div>
-						<ul
-							tabIndex={-1}
-							className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow"
+					) : (
+						<div
+							className="tooltip tooltip-bottom"
+							data-tip="Login with NIP-07"
 						>
-							<li>
-								<a className="justify-between">
-									Profile
-									<span className="badge">New</span>
-								</a>
-							</li>
-							<li>
-								<a>Settings</a>
-							</li>
-							<li>
-								<a>Logout</a>
-							</li>
-						</ul>
-					</div>
+							<button
+								className="btn btn-ghost btn-circle hover:bg-primary/20 border-transparent hover:border-transparent"
+								onClick={login}
+								disabled={isLoggingIn}
+								aria-label="Login with NIP-07"
+							>
+								<IconLogin size={22} className="text-primary" />
+							</button>
+						</div>
+					)}
 				</div>
 			</div>
 		</div>
