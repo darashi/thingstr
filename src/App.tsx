@@ -1,3 +1,4 @@
+import { Outlet } from "@tanstack/react-router";
 import "./App.css";
 import Navbar from "./components/Navbar";
 
@@ -6,6 +7,7 @@ function App() {
 		<>
 			<Navbar />
 			<main className="container mx-auto px-4 py-6">
+				<Outlet />
 			</main>
 		</>
 	);
