@@ -4,8 +4,8 @@ import { useEventStore } from "./useEventStore";
 import { useRelayPool } from "./useRelayPool";
 
 const REACTION_FILTERS = [
-	{ kinds: [17], "#k": ["wikidata"] },
-	{ kinds: [5] },
+	{ kinds: [17], "#k": ["wikidata"], limit: 500 },
+	{ kinds: [5], limit: 500 },
 ];
 
 export function useThingstrReactionsSubscription() {
