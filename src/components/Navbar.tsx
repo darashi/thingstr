@@ -51,7 +51,7 @@ export default function Navbar() {
 								</div>
 							</summary>
 							<ul
-								className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-56 p-3 shadow"
+								className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-56 p-3 shadow right-0"
 							>
 								<li className="text-lg leading-relaxed">
 									{npubLink ? (
