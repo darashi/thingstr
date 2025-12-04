@@ -6,14 +6,16 @@ import type { EntityProperty } from "../hooks/useWikidataEntity";
 interface EntityPropertiesProps {
 	properties: EntityProperty[];
 	isLoading: boolean;
-	isLabelsLoading?: boolean;
+	loadingLabelIds?: string[];
 }
 
 export default function EntityProperties({
 	properties,
 	isLoading,
-	isLabelsLoading = false,
+	loadingLabelIds = [],
 }: EntityPropertiesProps) {
+	const loadingLabelIdSet = new Set(loadingLabelIds);
+
 	const wrapWithTooltip = (
 		node: ReactNode,
 		description?: string | null,
@@ -31,9 +33,11 @@ export default function EntityProperties({
 		{
 			compact = false,
 			isLoaded = false,
-		}: { compact?: boolean; isLoaded?: boolean } = {},
+			isLoadingLabel = false,
+		}: { compact?: boolean; isLoaded?: boolean; isLoadingLabel?: boolean } = {},
 	) => {
 		const textSize = compact ? "text-xs" : "text-sm";
+		const showSkeleton = !isLoaded && isLoadingLabel;
 		if (value.type === "entity" && value.id) {
 			const linkClass = value.label
 				? "text-primary underline underline-offset-4"
@@ -46,7 +50,7 @@ export default function EntityProperties({
 				>
 					{value.label ? (
 						value.label
-					) : isLoaded ? (
+					) : isLoaded && !showSkeleton ? (
 						<span className="italic text-base-content/60">No label defined</span>
 					) : (
 						<span className="skeleton inline-block h-4 w-32 align-middle" />
@@ -87,7 +91,7 @@ export default function EntityProperties({
 				className={`${textSize} text-base-content/80 break-words whitespace-pre-wrap block`}
 			>
 				{value.label ??
-					(isLoaded ? (
+					(isLoaded && !showSkeleton ? (
 						<span className="italic text-base-content/60">No value defined</span>
 					) : (
 						<span className="skeleton inline-block h-4 w-24 align-middle" />
@@ -140,18 +144,27 @@ export default function EntityProperties({
 								</Link>,
 								property.propertyDescription,
 							)
-						) : (
+						) : loadingLabelIdSet.has(property.propertyId) ? (
 							<span className="skeleton h-4 w-32 md:w-36" />
+						) : (
+							<span className="italic text-base-content/60 text-sm">
+								No label defined
+							</span>
 						)}
 						<IdBadge id={property.propertyId} />
 					</div>
 					<div className="flex flex-1 flex-col gap-2 min-w-0">
 						{property.values.map((value, index) => {
 							const key = `${property.propertyId}-${value.id ?? value.label}-${index}`;
+							const isValueLoadingLabel =
+								value.type === "entity" && value.id
+									? loadingLabelIdSet.has(value.id)
+									: false;
 							return (
 								<div key={key} className="flex flex-col gap-1 min-w-0">
 									{renderValueContent(value, {
-										isLoaded: !isLoading && !isLabelsLoading,
+										isLoaded: !isLoading && !isValueLoadingLabel,
+										isLoadingLabel: isValueLoadingLabel,
 									})}
 									{value.qualifiers && value.qualifiers.length ? (
 										<div className="ml-3 border-l border-base-300/70 pl-3 space-y-1 text-xs text-base-content/70 min-w-0">
@@ -172,14 +185,29 @@ export default function EntityProperties({
 																</Link>,
 																qualifier.propertyDescription,
 															)
-														) : (
+														) : loadingLabelIdSet.has(qualifier.propertyId) ? (
 															<span className="skeleton h-3 w-20 rounded" />
+														) : (
+															<span className="italic text-base-content/60">
+																No label defined
+															</span>
 														)}
 														<IdBadge id={qualifier.propertyId} />
 														<span className="text-base-content/50">→</span>
 														{renderValueContent(qualifier.value, {
 															compact: true,
-															isLoaded: !isLoading && !isLabelsLoading,
+															isLoaded:
+																!isLoading &&
+																!(
+																	qualifier.value.type === "entity" &&
+																	qualifier.value.id &&
+																	loadingLabelIdSet.has(qualifier.value.id)
+																),
+															isLoadingLabel:
+																qualifier.value.type === "entity" &&
+																qualifier.value.id
+																	? loadingLabelIdSet.has(qualifier.value.id)
+																	: false,
 														})}
 													</div>
 												),

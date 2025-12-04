@@ -103,7 +103,7 @@ const thingRoute = createRoute({
 			properties,
 			isLoading,
 			isPropertiesLoading,
-			isLabelMapLoading,
+			loadingLabelIds,
 			error,
 			isLabelMissing,
 			isDescriptionMissing,
@@ -165,7 +165,7 @@ const thingRoute = createRoute({
 							<EntityProperties
 								properties={properties}
 								isLoading={isPropertiesLoading}
-								isLabelsLoading={isLabelMapLoading}
+								loadingLabelIds={loadingLabelIds}
 							/>
 						</div>
 					</div>

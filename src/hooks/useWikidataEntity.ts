@@ -62,6 +62,7 @@ export interface WikidataEntityResult {
 	isLabelMissing: boolean;
 	isDescriptionMissing: boolean;
 	isLabelMapLoading: boolean;
+	loadingLabelIds: string[];
 }
 
 type LabelMap = Record<string, string>;
@@ -87,6 +88,7 @@ export function useWikidataEntity(
 	options: UseWikidataEntityOptions = {},
 ): WikidataEntityResult {
 	const { language = "en" } = options;
+	const metaCache = getEntityMetaCache(language);
 	const trimmedId = useMemo(() => id.trim(), [id]);
 	const missingIdMessage = useMemo(
 		() => (!trimmedId ? "Missing entity id" : null),
@@ -230,7 +232,6 @@ export function useWikidataEntity(
 
 			const languagesParam =
 				languageCode === "en" ? "en" : `${languageCode}|en`;
-			const metaCache = getEntityMetaCache(languageCode);
 
 			const unknownIds = ids.filter((id) => metaCache[id] === undefined);
 
@@ -313,6 +314,9 @@ export function useWikidataEntity(
 		labelIds.length > 0
 			? labelsQuery.isPending || labelsQuery.isFetching
 			: false;
+	const loadingLabelIds = isLabelMapLoading
+		? labelIds.filter((labelId) => metaCache[labelId] === undefined)
+		: [];
 
 	const properties = useMemo(() => {
 		return Object.entries(claims)
@@ -376,6 +380,7 @@ export function useWikidataEntity(
 		isLoading,
 		isPropertiesLoading,
 		isLabelMapLoading,
+		loadingLabelIds,
 		error,
 		isLabelMissing,
 		isDescriptionMissing,
