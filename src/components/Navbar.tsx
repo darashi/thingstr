@@ -1,4 +1,4 @@
-import { IconLogin, IconUser } from "@tabler/icons-react";
+import { IconLogin, IconLogout, IconUser } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import SearchBar from "./SearchBar";
@@ -59,12 +59,14 @@ export default function Navbar() {
 											to="/p/$npub"
 											params={{ npub: npubLink }}
 											onClick={() => setIsMenuOpen(false)}
-											className="block py-3 px-2"
+											className="flex items-center gap-2 py-3 px-2"
 										>
+											<IconUser size={18} />
 											My page
 										</Link>
 									) : (
-										<span className="block py-3 px-2 text-base-content/60">
+										<span className="flex items-center gap-2 py-3 px-2 text-base-content/60">
+											<IconUser size={18} />
 											My page
 										</span>
 									)}
@@ -76,8 +78,9 @@ export default function Navbar() {
 											logout();
 											setIsMenuOpen(false);
 										}}
-										className="text-left block w-full py-3 px-2"
+										className="text-left flex items-center gap-2 w-full py-3 px-2"
 									>
+										<IconLogout size={18} />
 										Log out
 									</button>
 								</li>
