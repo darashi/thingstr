@@ -2,3 +2,13 @@
 @plugin "daisyui" {
     themes: garden;
 }
+
+:root,
+body {
+    min-height: 100%;
+}
+
+body,
+#root {
+    overflow-x: hidden;
+}
