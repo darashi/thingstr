@@ -27,6 +27,18 @@ export interface WikidataEntitySummariesResult {
 	error: string | null;
 }
 
+type EntityMeta = { label: string | null; description: string | null };
+type EntityMetaCache = Record<string, EntityMeta | undefined>;
+
+const entityMetaCacheByLanguage: Record<string, EntityMetaCache> = {};
+
+function getEntityMetaCache(language: string): EntityMetaCache {
+	if (!entityMetaCacheByLanguage[language]) {
+		entityMetaCacheByLanguage[language] = {};
+	}
+	return entityMetaCacheByLanguage[language];
+}
+
 export function useWikidataEntitySummaries(
 	ids: string[],
 	options: UseWikidataEntitySummariesOptions = {},
@@ -59,11 +71,24 @@ export function useWikidataEntitySummaries(
 
 			const languagesParam =
 				languageCode === "en" ? "en" : `${languageCode}|en`;
+			const metaCache = getEntityMetaCache(languageCode);
+
+			const unknownIds = entityIds.filter((id) => metaCache[id] === undefined);
 
 			const summaries: Record<string, EntitySummary> = {};
+			if (!unknownIds.length) {
+				entityIds.forEach((id) => {
+					summaries[id] = {
+						label: metaCache[id]?.label ?? null,
+						description: metaCache[id]?.description ?? null,
+					};
+				});
+				return summaries;
+			}
+
 			const chunks: string[][] = [];
-			for (let i = 0; i < entityIds.length; i += 50) {
-				chunks.push(entityIds.slice(i, i + 50));
+			for (let i = 0; i < unknownIds.length; i += 50) {
+				chunks.push(unknownIds.slice(i, i + 50));
 			}
 
 			for (const chunk of chunks) {
@@ -89,12 +114,22 @@ export function useWikidataEntitySummaries(
 				for (const [entityId, entity] of Object.entries(data.entities ?? {})) {
 					const label = pickLabel(entity.labels ?? {}, languageCode);
 					const description = pickLabel(entity.descriptions ?? {}, languageCode);
-					summaries[entityId] = {
-						label: label ?? null,
-						description: description ?? null,
-					};
+					metaCache[entityId] = { label: label ?? null, description: description ?? null };
 				}
+
+				chunk.forEach((entityId) => {
+					if (metaCache[entityId] === undefined) {
+						metaCache[entityId] = { label: null, description: null };
+					}
+				});
 			}
+
+			entityIds.forEach((id) => {
+				summaries[id] = {
+					label: metaCache[id]?.label ?? null,
+					description: metaCache[id]?.description ?? null,
+				};
+			});
 
 			return summaries;
 		},

@@ -66,11 +66,21 @@ export interface WikidataEntityResult {
 
 type LabelMap = Record<string, string>;
 type DescriptionMap = Record<string, string>;
+type EntityMeta = { label: string | null; description: string | null };
+type EntityMetaCache = Record<string, EntityMeta | undefined>;
 
 const ENDPOINT = "https://www.wikidata.org/w/api.php";
 const EMPTY_CLAIMS: Record<string, WikidataClaim[]> = {};
 const EMPTY_LABEL_MAP: LabelMap = {};
 const EMPTY_DESCRIPTION_MAP: DescriptionMap = {};
+const entityMetaCacheByLanguage: Record<string, EntityMetaCache> = {};
+
+function getEntityMetaCache(language: string): EntityMetaCache {
+	if (!entityMetaCacheByLanguage[language]) {
+		entityMetaCacheByLanguage[language] = {};
+	}
+	return entityMetaCacheByLanguage[language];
+}
 
 export function useWikidataEntity(
 	id: string,
@@ -220,13 +230,28 @@ export function useWikidataEntity(
 
 			const languagesParam =
 				languageCode === "en" ? "en" : `${languageCode}|en`;
+			const metaCache = getEntityMetaCache(languageCode);
+
+			const unknownIds = ids.filter((id) => metaCache[id] === undefined);
 
 			const map: LabelMap = {};
 			const descriptionMap: DescriptionMap = {};
+			if (!unknownIds.length) {
+				ids.forEach((id) => {
+					const cached = metaCache[id];
+					if (cached?.label) {
+						map[id] = cached.label;
+					}
+					if (cached?.description) {
+						descriptionMap[id] = cached.description;
+					}
+				});
+				return { labelMap: map, descriptionMap };
+			}
 
 			const chunks: string[][] = [];
-			for (let i = 0; i < ids.length; i += 50) {
-				chunks.push(ids.slice(i, i + 50));
+			for (let i = 0; i < unknownIds.length; i += 50) {
+				chunks.push(unknownIds.slice(i, i + 50));
 			}
 
 			for (const chunk of chunks) {
@@ -258,14 +283,25 @@ export function useWikidataEntity(
 						entity.descriptions ?? {},
 						languageCode,
 					);
-					if (label) {
-						map[entityId] = label;
-					}
-					if (description) {
-						descriptionMap[entityId] = description;
-					}
+					metaCache[entityId] = { label: label ?? null, description: description ?? null };
 				}
+
+				chunk.forEach((entityId) => {
+					if (metaCache[entityId] === undefined) {
+						metaCache[entityId] = { label: null, description: null };
+					}
+				});
 			}
+
+			ids.forEach((id) => {
+				const cached = metaCache[id];
+				if (cached?.label) {
+					map[id] = cached.label;
+				}
+				if (cached?.description) {
+					descriptionMap[id] = cached.description;
+				}
+			});
 
 			return { labelMap: map, descriptionMap };
 		},
