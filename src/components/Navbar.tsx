@@ -11,7 +11,7 @@ export default function Navbar() {
 		useNip07Auth();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 	const pubkey = session?.pubkey ?? null;
-	const npubLink = pubkey ? encodeNpub(pubkey) ?? pubkey : null;
+	const npubLink = pubkey ? (encodeNpub(pubkey) ?? pubkey) : null;
 	const { picture: profilePicture } = useProfile(pubkey);
 	const profileImage = session?.picture ?? profilePicture ?? null;
 
@@ -24,7 +24,8 @@ export default function Navbar() {
 			<div className="container mx-auto flex items-center gap-2">
 				<div className="flex-none">
 					<Link to="/" className="btn btn-ghost text-xl">
-						thingstr
+						<span className="mx-0 text-primary">thing</span>
+						<span className="-mx-1.5">str</span>
 					</Link>
 				</div>
 				<div className="flex flex-1 items-center gap-2">
@@ -50,9 +51,7 @@ export default function Navbar() {
 									</div>
 								</div>
 							</summary>
-							<ul
-								className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-56 p-3 shadow right-0"
-							>
+							<ul className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-56 p-3 shadow right-0">
 								<li className="text-lg leading-relaxed">
 									{npubLink ? (
 										<Link
