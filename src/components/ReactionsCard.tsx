@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useWikidataReactions } from "../hooks/useWikidataReactions";
 import { useToggleWikidataReaction } from "../hooks/useToggleWikidataReaction";
-import LinkedUserAvatar from "./LinkedUserAvatar";
-import { encodeNpub, normalizePubkey } from "../lib/nostr";
+import { normalizePubkey } from "../lib/nostr";
 import StarToggle from "./StarToggle";
 import { useNip07Auth } from "../hooks/useNip07Auth";
 import { useWikidataReactionsTimeline } from "../hooks/useWikidataReactionsTimeline";
+import ReactionAvatarList from "./ReactionAvatarList";
 
 interface ReactionsCardProps {
 	entityId: string;
@@ -30,19 +30,19 @@ export default function ReactionsCard({
 		[session?.pubkey],
 	);
 
-	const reactionPubkeys = useMemo(() => {
+	const reactionAvatars = useMemo(() => {
 		const seen = new Set<string>();
-		const own: string[] = [];
-		const others: string[] = [];
+		const own: { pubkey: string; createdAt?: number }[] = [];
+		const others: { pubkey: string; createdAt?: number }[] = [];
 		reactions.forEach((item) => {
 			if (item.entityId !== entityId) return;
 			const normalized = normalizePubkey(item.pubkey) ?? item.pubkey;
 			if (!normalized || seen.has(normalized)) return;
 			seen.add(normalized);
 			if (viewerPubkey && normalized === viewerPubkey) {
-				own.push(normalized);
+				own.push({ pubkey: normalized, createdAt: item.event?.created_at });
 			} else {
-				others.push(normalized);
+				others.push({ pubkey: normalized, createdAt: item.event?.created_at });
 			}
 		});
 		return [...own, ...others];
@@ -65,20 +65,7 @@ export default function ReactionsCard({
 						isDisabled={!isLoggedIn}
 					/>
 					<div className="min-h-[32px] flex items-center gap-2">
-						{reactionPubkeys.length ? (
-							<div className="flex items-center gap-2 flex-wrap">
-								{reactionPubkeys.map((userPubkey) => (
-									<LinkedUserAvatar
-										key={userPubkey}
-										npub={encodeNpub(userPubkey) ?? userPubkey}
-									/>
-								))}
-							</div>
-						) : (
-							<span className="text-sm text-base-content/60 font-medium">
-								No reactions yet
-							</span>
-						)}
+						<ReactionAvatarList reactions={reactionAvatars} />
 					</div>
 				</div>
 			</div>
