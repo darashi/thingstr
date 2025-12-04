@@ -34,12 +34,12 @@ function UserReactionEntry({
 	canToggle,
 }: UserReactionEntryProps) {
 	const { event, entityId } = item;
-	const { isStarred, lastReactionEventId } = useWikidataReactions(entityId, {
+	const { isStarred } = useWikidataReactions(entityId, {
 		pubkey: event.pubkey,
 	});
 	const { toggle, isSaving } = useToggleWikidataReaction({
 		entityId,
-		lastReactionEventId,
+		lastReactionEventId: event.id,
 	});
 
 	const handleToggle = () => {
