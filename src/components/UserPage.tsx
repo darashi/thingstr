@@ -16,6 +16,9 @@ import { encodeNpub, normalizePubkey } from "../lib/nostr";
 import type { WikidataReactionItem } from "../hooks/useWikidataReactionsTimeline";
 import { useNip07Auth } from "../hooks/useNip07Auth";
 import { useProfile } from "../hooks/useProfile";
+import { useRelayPool } from "../hooks/useRelayPool";
+import { useEventStore } from "../hooks/useEventStore";
+import { THINGSTR_RELAYS } from "../config/relays";
 
 interface UserReactionEntryProps {
 	item: WikidataReactionItem;
@@ -107,6 +110,8 @@ export default function UserPage({ npub }: UserPageProps) {
 	const language = useBrowserLanguage();
 	const { name } = useProfile(normalizedPubkey);
 	const reactions = useUserWikidataReactions(normalizedPubkey);
+	const eventStore = useEventStore();
+	const relayPool = useRelayPool();
 	const entityIds = useMemo(
 		() => Array.from(new Set(reactions.map((item) => item.entityId))),
 		[reactions],
@@ -125,6 +130,29 @@ export default function UserPage({ npub }: UserPageProps) {
 			document.title = baseTitle;
 		};
 	}, [titleSubject]);
+
+	useEffect(() => {
+		if (!normalizedPubkey) return;
+		if (!THINGSTR_RELAYS.length) return;
+
+		const filters = [
+			{ kinds: [17], "#k": ["wikidata"], authors: [normalizedPubkey], limit: 500 },
+			{ kinds: [5], authors: [normalizedPubkey], limit: 500 },
+		];
+
+		const group = relayPool.group(THINGSTR_RELAYS);
+		const sub = group.request(filters, { eventStore }).subscribe({
+			next: (event) => {
+				if (!event || typeof event === "string") return;
+				eventStore.add(event as never);
+			},
+			error: (error) => {
+				console.error("Failed to load user reactions", error);
+			},
+		});
+
+		return () => sub.unsubscribe();
+	}, [eventStore, normalizedPubkey, relayPool]);
 
 	if (!normalizedPubkey) {
 		return (
