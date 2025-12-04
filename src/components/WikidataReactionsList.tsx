@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { IconStar } from "@tabler/icons-react";
 import IdBadge from "./IdBadge";
@@ -12,6 +12,9 @@ import type { EntitySummary } from "../hooks/useWikidataEntitySummaries";
 import { useToggleWikidataReaction } from "../hooks/useToggleWikidataReaction";
 import { useNip07Auth } from "../hooks/useNip07Auth";
 import StarToggle from "./StarToggle";
+import { THINGSTR_RELAYS } from "../config/relays";
+import { useRelayPool } from "../hooks/useRelayPool";
+import { useEventStore } from "../hooks/useEventStore";
 
 const MAX_ENTITIES = 200;
 
@@ -110,6 +113,11 @@ function GroupedReactionCard({
 	isSummaryLoading,
 	reactions,
 }: GroupedReactionCardProps) {
+	const containerRef = useRef<HTMLDivElement | null>(null);
+	const backfillSubRef = useRef<{ unsubscribe: () => void } | null>(null);
+	const hasBackfilledRef = useRef(false);
+	const relayPool = useRelayPool();
+	const eventStore = useEventStore();
 	const { session } = useNip07Auth();
 	const { isStarred, lastReactionEventId } = useWikidataReactions(entityId);
 	const { toggle, isSaving } = useToggleWikidataReaction({
@@ -133,6 +141,52 @@ function GroupedReactionCard({
 		void toggle(isStarred);
 	};
 
+	useEffect(() => {
+		const element = containerRef.current;
+		if (!element) return;
+		if (!THINGSTR_RELAYS.length) return;
+		if (hasBackfilledRef.current) return;
+
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach((entry) => {
+				if (!entry.isIntersecting) return;
+				if (hasBackfilledRef.current) return;
+				hasBackfilledRef.current = true;
+				const filters = [
+					{
+						kinds: [17],
+						"#k": ["wikidata"],
+						"#i": [`wd:${entityId}`],
+						limit: 500,
+					},
+				];
+				const group = relayPool.group(THINGSTR_RELAYS);
+				backfillSubRef.current = group.request(filters, { eventStore }).subscribe(
+					{
+						next: (event) => {
+							if (!event || typeof event === "string") return;
+							eventStore.add(event as never);
+						},
+						error: (error) => {
+							console.error(
+								`Failed to backfill reactions for entity ${entityId}`,
+								error,
+							);
+						},
+					},
+				);
+				observer.disconnect();
+			});
+		});
+
+		observer.observe(element);
+
+		return () => {
+			observer.disconnect();
+			backfillSubRef.current?.unsubscribe();
+		};
+	}, [entityId, eventStore, relayPool]);
+
 	const labelClassName = summary?.label
 		? "text-base-content"
 		: "italic text-base-content/60";
@@ -140,7 +194,7 @@ function GroupedReactionCard({
 	const descriptionText = summary?.description;
 
 	return (
-		<div className="card bg-base-100 shadow-sm rounded-md">
+		<div ref={containerRef} className="card bg-base-100 shadow-sm rounded-md">
 			<div className="card-body py-3 px-4 flex flex-col gap-2">
 				<div className="flex flex-wrap items-center gap-2">
 					{isSummaryLoading ? (
