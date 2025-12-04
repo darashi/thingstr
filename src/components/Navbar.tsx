@@ -87,7 +87,7 @@ export default function Navbar() {
 						</details>
 					) : (
 						<div
-							className="tooltip tooltip-bottom"
+							className="tooltip tooltip-left"
 							data-tip="Login with NIP-07"
 						>
 							<button
