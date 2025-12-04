@@ -36,8 +36,7 @@ const indexRoute = createRoute({
 			<div className="hero bg-base-100 border border-base-300 rounded-xl shadow-sm p-6">
 				<div className="hero-content flex-col text-center gap-3 p-0">
 					<h1 className="text-2xl font-bold leading-tight">
-						React to every{" "}
-						<span className="font-semibold text-primary">thing</span>.
+						React to every<span className="font-semibold text-primary">thing</span>.
 					</h1>
 					<p className="text-base-content/70">
 						Create{" "}
