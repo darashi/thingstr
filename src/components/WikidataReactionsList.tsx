@@ -12,6 +12,8 @@ import { useToggleWikidataReaction } from "../hooks/useToggleWikidataReaction";
 import { useNip07Auth } from "../hooks/useNip07Auth";
 import StarToggle from "./StarToggle";
 
+const MAX_ENTITIES = 200;
+
 export default function WikidataReactionsList() {
 	const language = useBrowserLanguage();
 	const reactions = useWikidataReactionsTimeline();
@@ -51,7 +53,8 @@ export default function WikidataReactionsList() {
 
 		return Array.from(map.values())
 			.map(({ seen: _seen, ...rest }) => rest)
-			.sort((a, b) => (b.latestAt ?? 0) - (a.latestAt ?? 0));
+			.sort((a, b) => (b.latestAt ?? 0) - (a.latestAt ?? 0))
+			.slice(0, MAX_ENTITIES);
 	}, [reactions]);
 
 	const entityIds = useMemo(
