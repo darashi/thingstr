@@ -8,6 +8,7 @@ import { useWikidataReactionsTimeline } from "../hooks/useWikidataReactionsTimel
 import ReactionAvatarList from "./ReactionAvatarList";
 import { normalizePubkey } from "../lib/nostr";
 import { useWikidataReactions } from "../hooks/useWikidataReactions";
+import type { EntitySummary } from "../hooks/useWikidataEntitySummaries";
 import { useToggleWikidataReaction } from "../hooks/useToggleWikidataReaction";
 import { useNip07Auth } from "../hooks/useNip07Auth";
 import StarToggle from "./StarToggle";
@@ -98,7 +99,7 @@ export default function WikidataReactionsList() {
 
 interface GroupedReactionCardProps {
 	entityId: string;
-	summary?: { label?: string; description?: string };
+	summary?: EntitySummary;
 	isSummaryLoading: boolean;
 	reactions: { pubkey: string; createdAt?: number }[];
 }
