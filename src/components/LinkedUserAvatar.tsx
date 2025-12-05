@@ -15,6 +15,7 @@ type BaseProps = {
 	sizeClassName?: string;
 	showRing?: boolean;
 	iconSize?: number;
+	isFollowing?: boolean;
 };
 
 type LinkedUserAvatarProps =
@@ -42,6 +43,7 @@ export default function LinkedUserAvatar(props: LinkedUserAvatarProps) {
 	const sizeClassName = props.sizeClassName ?? "w-8 h-8";
 	const showRing = props.showRing ?? true;
 	const iconSize = props.iconSize ?? 18;
+	const isFollowing = props.isFollowing ?? false;
 	const { session } = useNip07Auth();
 
 	const isProfileEventProps = "profileEvent" in props;
@@ -77,7 +79,11 @@ export default function LinkedUserAvatar(props: LinkedUserAvatarProps) {
 	);
 	const { picture: fetchedPicture } = useProfile(pubkey);
 	const displayPicture = cachedPicture ?? fetchedPicture ?? null;
-	const ringColorClass = isViewer ? "ring-primary" : "ring-base-300";
+	const ringColorClass = isViewer
+		? "ring-primary"
+		: isFollowing
+			? "ring-secondary"
+			: "ring-base-300";
 	const ringClassName = showRing
 		? `ring ${ringColorClass} ring-offset-1 ring-offset-base-100`
 		: "";

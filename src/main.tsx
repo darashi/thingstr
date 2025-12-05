@@ -21,6 +21,7 @@ import UserPage from "./components/UserPage";
 import { EventStoreProvider } from "./providers/EventStoreProvider";
 import { RelayPoolProvider } from "./providers/RelayPoolProvider";
 import { useThingstrReactionsSubscription } from "./hooks/useThingstrReactionsSubscription";
+import { useFollowersSubscription } from "./hooks/useFollowersSubscription";
 
 const queryClient = new QueryClient();
 
@@ -199,11 +200,17 @@ function ThingstrRelayBootstrap() {
 	return null;
 }
 
+function FollowersBootstrap() {
+	useFollowersSubscription();
+	return null;
+}
+
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
 		<RelayPoolProvider>
 			<EventStoreProvider>
 				<ThingstrRelayBootstrap />
+				<FollowersBootstrap />
 				<QueryClientProvider client={queryClient}>
 					<div className="bg-base-200 min-h-screen">
 						<RouterProvider router={router} />
