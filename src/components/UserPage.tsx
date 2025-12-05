@@ -114,7 +114,7 @@ function UserReactionEntry({
 											key={id}
 											type="button"
 											className={`px-2 py-1 rounded-md bg-base-200 text-base-content/80 hover:bg-base-300 transition-colors ${
-												selectedClassification === id ? "ring ring-primary/30" : ""
+												selectedClassification === id ? "ring-2 ring-primary/60" : ""
 											}`}
 											onClick={() => onClassificationClick(id)}
 										>
