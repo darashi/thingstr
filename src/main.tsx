@@ -22,6 +22,7 @@ import { EventStoreProvider } from "./providers/EventStoreProvider";
 import { RelayPoolProvider } from "./providers/RelayPoolProvider";
 import { useThingstrReactionsSubscription } from "./hooks/useThingstrReactionsSubscription";
 import { useFollowersSubscription } from "./hooks/useFollowersSubscription";
+import { THINGSTR_RELAYS } from "./config/relays";
 
 const queryClient = new QueryClient();
 
@@ -37,7 +38,8 @@ const indexRoute = createRoute({
 			<div className="hero bg-base-100 border border-base-300 rounded-xl shadow-sm p-6">
 				<div className="hero-content flex-col text-center gap-3 p-0">
 					<h1 className="text-2xl font-bold leading-tight">
-						React to every<span className="font-semibold text-primary">thing</span>.
+						React to every
+						<span className="font-semibold text-primary">thing</span>.
 					</h1>
 					<p className="text-base-content/70">
 						Create{" "}
@@ -59,7 +61,8 @@ const indexRoute = createRoute({
 							Wikidata
 						</a>
 						. As thingstr is beta, all reactions are sent to the dedicated
-						thingstr relay and the data on the relay may be deleted.
+						thingstr relay and the data on the relay may be deleted. The relay
+						is at <code>{THINGSTR_RELAYS.join(",")}</code> (as for now)
 					</p>
 					<p className="text-base-content/60">
 						Original idea:{" "}
