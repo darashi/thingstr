@@ -1,5 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { useDeferredValue, useMemo, useState } from "react";
+import {
+	useDeferredValue,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { IconSearch } from "@tabler/icons-react";
 import { useBrowserLanguage } from "../hooks/useBrowserLanguage";
 import { useWikidataSearch } from "../hooks/useWikidataSearch";
@@ -12,26 +18,47 @@ interface SearchBarProps {
 export default function SearchBar({ className }: SearchBarProps) {
 	const language = useBrowserLanguage();
 	const [query, setQuery] = useState("");
+	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+	const containerRef = useRef<HTMLDivElement | null>(null);
 	const deferredQuery = useDeferredValue(query);
 	const hasQuery = useMemo(() => query.trim().length > 0, [query]);
+	const showDropdown = hasQuery && isDropdownOpen;
 	const { results, isLoading, error } = useWikidataSearch(deferredQuery, {
 		language,
 	});
 
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target;
+			if (!(target instanceof Node)) return;
+
+			if (containerRef.current && !containerRef.current.contains(target)) {
+				setIsDropdownOpen(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, []);
+
 	return (
-		<div className={`relative ${className ?? ""}`}>
+		<div ref={containerRef} className={`relative ${className ?? ""}`}>
 			<input
 				type="text"
 				placeholder="Search"
 				value={query}
-				onChange={(event) => setQuery(event.target.value)}
+				onChange={(event) => {
+					setQuery(event.target.value);
+					setIsDropdownOpen(true);
+				}}
+				onFocus={() => setIsDropdownOpen(true)}
 				className="input input-bordered w-full pl-10"
 			/>
 			<IconSearch
 				size={20}
 				className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base-content/60 z-10"
 			/>
-			{hasQuery ? (
+			{showDropdown ? (
 				<div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-md bg-base-100 shadow-lg">
 					{isLoading ? (
 						<div className="flex items-center gap-2 px-4 py-3 text-sm text-base-content/70">
@@ -46,7 +73,10 @@ export default function SearchBar({ className }: SearchBarProps) {
 										className="flex flex-col gap-1 px-4 py-3 transition-colors hover:bg-base-200"
 										to="/things/$id"
 										params={{ id: item.id }}
-										onClick={() => setQuery("")}
+										onClick={() => {
+											setQuery("");
+											setIsDropdownOpen(false);
+										}}
 									>
 										<div className="flex items-center gap-2">
 											<span className="text-sm font-semibold">
