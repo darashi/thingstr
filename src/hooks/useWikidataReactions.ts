@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "./useProfile";
 import { useEventStore } from "./useEventStore";
 import { useNip07Auth } from "./useNip07Auth";
+import { withWikidataPrefix } from "../lib/wikidata";
 
 interface UseWikidataReactionsResult {
 	isStarred: boolean;
@@ -28,14 +29,18 @@ export function useWikidataReactions(
 	const eventStore = useEventStore();
 	const { session } = useNip07Auth();
 	const pubkeyToTrack = targetPubkey ?? session?.pubkey ?? null;
+	const prefixedEntityId = useMemo(
+		() => withWikidataPrefix(entityId),
+		[entityId],
+	);
 	const filter = useMemo(
 		(): ReactionFilter => ({
 			kinds: [17],
-			"#i": [`wd:${entityId}`],
+			"#i": [prefixedEntityId],
 			"#k": ["wikidata"],
 			...(pubkeyToTrack ? { authors: [pubkeyToTrack] } : {}),
 		}),
-		[entityId, pubkeyToTrack],
+		[prefixedEntityId, pubkeyToTrack],
 	);
 
 	const [pubkey, setPubkey] = useState<string | null>(null);

@@ -19,6 +19,7 @@ import { useProfile } from "../hooks/useProfile";
 import { useRelayPool } from "../hooks/useRelayPool";
 import { useEventStore } from "../hooks/useEventStore";
 import { THINGSTR_RELAYS } from "../config/relays";
+import { stripWikidataPrefix } from "../lib/wikidata";
 
 interface UserReactionEntryProps {
 	item: WikidataReactionItem;
@@ -216,11 +217,9 @@ export default function UserPage({ npub }: UserPageProps) {
 			const ids = new Set(map[entityId] ?? []);
 			event.tags.forEach(([key, value]) => {
 				if (key !== "l" || typeof value !== "string") return;
-				if (!value.startsWith("wdt:P31 wd:")) return;
-				const id = value.replace("wdt:P31 wd:", "").trim();
-				if (id) {
-					ids.add(id);
-				}
+				if (!value.startsWith("wdt:P31 ")) return;
+				const id = stripWikidataPrefix(value.replace("wdt:P31 ", "").trim());
+				if (id) ids.add(id);
 			});
 			if (ids.size > 0) {
 				map[entityId] = Array.from(ids);

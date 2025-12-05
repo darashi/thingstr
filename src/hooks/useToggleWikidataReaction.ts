@@ -4,6 +4,7 @@ import { useNip07Auth } from "./useNip07Auth";
 import { useEventStore } from "./useEventStore";
 import { useRelayPool } from "./useRelayPool";
 import { THINGSTR_RELAYS } from "../config/relays";
+import { withWikidataPrefix } from "../lib/wikidata";
 
 type StarEventTemplate = {
 	kind: number;
@@ -60,7 +61,10 @@ export function useToggleWikidataReaction({
 			uniqueInstanceOfIds.length > 0
 				? [
 						["L", "wikidata:P31"],
-						...uniqueInstanceOfIds.map((id) => ["l", `wdt:P31 wd:${id}`]),
+						...uniqueInstanceOfIds.map((id) => [
+							"l",
+							`wdt:P31 ${withWikidataPrefix(id)}`,
+						]),
 				  ]
 				: [];
 
@@ -69,7 +73,7 @@ export function useToggleWikidataReaction({
 			content: "+",
 			tags: [
 				["k", "wikidata"],
-				["i", `wd:${entityId}`],
+				["i", withWikidataPrefix(entityId)],
 				...classificationTags,
 			],
 		});

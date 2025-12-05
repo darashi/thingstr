@@ -15,6 +15,7 @@ import StarToggle from "./StarToggle";
 import { THINGSTR_RELAYS } from "../config/relays";
 import { useRelayPool } from "../hooks/useRelayPool";
 import { useEventStore } from "../hooks/useEventStore";
+import { withWikidataPrefix } from "../lib/wikidata";
 
 const MAX_ENTITIES = 200;
 
@@ -129,6 +130,10 @@ function GroupedReactionCard({
 		() => (session?.pubkey ? normalizePubkey(session.pubkey) : null),
 		[session?.pubkey],
 	);
+	const prefixedEntityId = useMemo(
+		() => withWikidataPrefix(entityId),
+		[entityId],
+	);
 	const reactionsForDisplay = useMemo(() => {
 		if (!viewerPubkey) return reactions;
 		const own = reactions.filter((item) => item.pubkey === viewerPubkey);
@@ -156,7 +161,7 @@ function GroupedReactionCard({
 					{
 						kinds: [17],
 						"#k": ["wikidata"],
-						"#i": [`wd:${entityId}`],
+						"#i": [prefixedEntityId],
 						limit: 500,
 					},
 				];
@@ -185,7 +190,7 @@ function GroupedReactionCard({
 			observer.disconnect();
 			backfillSubRef.current?.unsubscribe();
 		};
-	}, [entityId, eventStore, relayPool]);
+	}, [entityId, eventStore, prefixedEntityId, relayPool]);
 
 	const labelClassName = summary?.label
 		? "text-base-content"

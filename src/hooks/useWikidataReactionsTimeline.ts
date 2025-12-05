@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useEventStore } from "./useEventStore";
+import { stripWikidataPrefix } from "../lib/wikidata";
 
 type ReactionEvent = {
 	id: string;
@@ -84,10 +85,12 @@ export function useWikidataReactionsTimeline(): WikidataReactionItem[] {
 				);
 				if (!entityTag) return null;
 				const [, value] = entityTag;
-				if (!value.startsWith("wd:")) return null;
+				if (!value) return null;
+				const id = stripWikidataPrefix(value);
+				if (!id) return null;
 				return {
 					event,
-					entityId: value.replace("wd:", ""),
+					entityId: id,
 					pubkey: event.pubkey,
 				};
 			})

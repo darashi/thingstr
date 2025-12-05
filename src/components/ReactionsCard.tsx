@@ -9,6 +9,7 @@ import ReactionAvatarList from "./ReactionAvatarList";
 import { useEventStore } from "../hooks/useEventStore";
 import { useRelayPool } from "../hooks/useRelayPool";
 import { THINGSTR_RELAYS } from "../config/relays";
+import { withWikidataPrefix } from "../lib/wikidata";
 
 interface ReactionsCardProps {
 	entityId: string;
@@ -34,6 +35,10 @@ export default function ReactionsCard({
 		() => (session?.pubkey ? normalizePubkey(session.pubkey) : null),
 		[session?.pubkey],
 	);
+	const prefixedEntityId = useMemo(
+		() => withWikidataPrefix(entityId),
+		[entityId],
+	);
 
 	useEffect(() => {
 		if (!THINGSTR_RELAYS.length) return;
@@ -42,7 +47,7 @@ export default function ReactionsCard({
 			{
 				kinds: [17],
 				"#k": ["wikidata"],
-				"#i": [`wd:${entityId}`],
+				"#i": [prefixedEntityId],
 				limit: 500,
 			},
 			{ kinds: [5], limit: 500 },
@@ -60,7 +65,7 @@ export default function ReactionsCard({
 		});
 
 		return () => sub.unsubscribe();
-	}, [entityId, eventStore, relayPool]);
+	}, [entityId, eventStore, prefixedEntityId, relayPool]);
 
 	const reactionAvatars = useMemo(() => {
 		const seen = new Set<string>();
