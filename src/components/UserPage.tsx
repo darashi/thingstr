@@ -332,7 +332,6 @@ export default function UserPage({ npub }: UserPageProps) {
 
 				const subscription = group.request(filters, { eventStore }).subscribe({
 					next: (event) => {
-						if (event === "EOSE") return;
 						if (!event || typeof event === "string") return;
 						const typedEvent = event as { created_at?: number; kind?: number };
 						if (typedEvent.kind === 17) reactionCount += 1;
@@ -378,7 +377,6 @@ export default function UserPage({ npub }: UserPageProps) {
 					.request(deleteFilters, { eventStore })
 					.subscribe({
 						next: (event) => {
-							if (event === "EOSE") return;
 							if (!event || typeof event === "string") return;
 							eventStore.add(event as never);
 						},
