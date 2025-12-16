@@ -187,6 +187,9 @@ interface UserPageProps {
 	npub: string;
 }
 
+const REACTION_PAGE_SIZE = 500;
+const MAX_REACTION_PAGES = 10;
+
 export default function UserPage({ npub }: UserPageProps) {
 	const normalizedPubkey = useMemo(() => normalizePubkey(npub), [npub]);
 	const { session } = useNip07Auth();
@@ -294,23 +297,126 @@ export default function UserPage({ npub }: UserPageProps) {
 		if (!normalizedPubkey) return;
 		if (!THINGSTR_RELAYS.length) return;
 
-		const filters = [
-			{ kinds: [17], "#k": ["wikidata"], authors: [normalizedPubkey], limit: 500 },
-			{ kinds: [5], authors: [normalizedPubkey], limit: 500 },
-		];
-
 		const group = relayPool.group(THINGSTR_RELAYS);
-		const sub = group.request(filters, { eventStore }).subscribe({
-			next: (event) => {
-				if (!event || typeof event === "string") return;
-				eventStore.add(event as never);
-			},
-			error: (error) => {
-				console.error("Failed to load user reactions", error);
-			},
-		});
+		let cancelCurrentRequest: (() => void) | null = null;
+		let cancelDeleteRequest: (() => void) | null = null;
+		let isCancelled = false;
 
-		return () => sub.unsubscribe();
+		type PageResult = {
+			earliestTimestamp: number | null;
+			reactionCount: number;
+		};
+
+		const loadPage = (until?: number): Promise<PageResult> =>
+			new Promise<PageResult>((resolve) => {
+				const filters = [
+					{
+						kinds: [17],
+						"#k": ["wikidata"],
+						authors: [normalizedPubkey],
+						limit: REACTION_PAGE_SIZE,
+						...(typeof until === "number" ? { until } : {}),
+					},
+				];
+
+				let earliestTimestamp: number | null = null;
+				let reactionCount = 0;
+				let isResolved = false;
+
+				const finish = (result: PageResult) => {
+					if (isResolved) return;
+					isResolved = true;
+					cancelCurrentRequest = null;
+					resolve(result);
+				};
+
+				const subscription = group.request(filters, { eventStore }).subscribe({
+					next: (event) => {
+						if (event === "EOSE") return;
+						if (!event || typeof event === "string") return;
+						const typedEvent = event as { created_at?: number; kind?: number };
+						if (typedEvent.kind === 17) reactionCount += 1;
+						if (typeof typedEvent.created_at === "number") {
+							earliestTimestamp =
+								earliestTimestamp === null
+									? typedEvent.created_at
+									: Math.min(earliestTimestamp, typedEvent.created_at);
+						}
+						eventStore.add(event as never);
+					},
+					error: (error) => {
+						console.error("Failed to load user reactions", error);
+						finish({
+							earliestTimestamp: null,
+							reactionCount: 0,
+						});
+					},
+					complete: () => finish({ earliestTimestamp, reactionCount }),
+				});
+
+				cancelCurrentRequest = () => {
+					subscription.unsubscribe();
+					finish({
+						earliestTimestamp: null,
+						reactionCount: 0,
+					});
+					cancelCurrentRequest = null;
+				};
+			});
+
+		const loadDeletes = () =>
+			new Promise<void>((resolve) => {
+				const deleteFilters = [
+					{
+						kinds: [5],
+						authors: [normalizedPubkey],
+						limit: REACTION_PAGE_SIZE,
+					},
+				];
+
+				const subscription = group
+					.request(deleteFilters, { eventStore })
+					.subscribe({
+						next: (event) => {
+							if (event === "EOSE") return;
+							if (!event || typeof event === "string") return;
+							eventStore.add(event as never);
+						},
+						error: (error) => {
+							console.error("Failed to load delete events", error);
+							resolve();
+						},
+						complete: () => resolve(),
+					});
+
+				cancelDeleteRequest = () => {
+					subscription.unsubscribe();
+					cancelDeleteRequest = null;
+					resolve();
+				};
+			});
+
+		void (async () => {
+			await loadDeletes();
+			let until: number | undefined;
+			for (let page = 0; page < MAX_REACTION_PAGES; page += 1) {
+				if (isCancelled) break;
+				const { earliestTimestamp, reactionCount } = await loadPage(until);
+				if (isCancelled) break;
+				if (earliestTimestamp === null) break;
+
+				const nextUntil = earliestTimestamp - 1;
+				if (until !== undefined && nextUntil >= until) break;
+				if (reactionCount < REACTION_PAGE_SIZE) break;
+				until = nextUntil;
+			}
+		})();
+
+		return () => {
+			isCancelled = true;
+			cancelCurrentRequest?.();
+			cancelDeleteRequest?.();
+		};
 	}, [eventStore, normalizedPubkey, relayPool]);
 
 	if (!normalizedPubkey) {
@@ -368,7 +474,10 @@ export default function UserPage({ npub }: UserPageProps) {
 		<div className="space-y-4">
 			<div className="card bg-base-100 shadow-sm rounded-md">
 				<div className="card-body py-5">
-					<UserHeader npub={displayNpub ?? npub} />
+					<UserHeader
+						npub={displayNpub ?? npub}
+						totalReactions={uniqueReactions.length}
+					/>
 				</div>
 			</div>
 

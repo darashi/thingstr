@@ -4,11 +4,13 @@ import { normalizePubkey } from "../lib/nostr";
 
 interface UserHeaderProps {
 	npub: string;
+	totalReactions?: number;
 }
 
-export default function UserHeader({ npub }: UserHeaderProps) {
+export default function UserHeader({ npub, totalReactions }: UserHeaderProps) {
 	const normalizedPubkey = normalizePubkey(npub);
 	const { name, isLoading } = useProfile(normalizedPubkey);
+	const displayName = name ?? npub;
 
 	return (
 		<div className="flex items-center gap-4">
@@ -20,9 +22,16 @@ export default function UserHeader({ npub }: UserHeaderProps) {
 			/>
 			{isLoading ? (
 				<div className="skeleton h-6 w-32" />
-			) : name ? (
-				<h1 className="text-xl font-semibold">{name}</h1>
-			) : null}
+			) : (
+				<div className="flex items-center gap-2">
+					<h1 className="text-xl font-semibold">{displayName}</h1>
+					{typeof totalReactions === "number" ? (
+						<span className="text-sm text-base-content/70">
+							({totalReactions} reactions)
+						</span>
+					) : null}
+				</div>
+			)}
 		</div>
 	);
 }
