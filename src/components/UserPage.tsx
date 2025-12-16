@@ -20,6 +20,7 @@ import { useRelayPool } from "../hooks/useRelayPool";
 import { useEventStore } from "../hooks/useEventStore";
 import { THINGSTR_RELAYS } from "../config/relays";
 import { stripWikidataPrefix } from "../lib/wikidata";
+import { useWikidataInstanceOf } from "../hooks/useWikidataInstanceOf";
 
 interface UserReactionEntryProps {
 	item: WikidataReactionItem;
@@ -211,22 +212,17 @@ export default function UserPage({ npub }: UserPageProps) {
 		() => Array.from(new Set(uniqueReactions.map((item) => item.entityId))),
 		[uniqueReactions],
 	);
+	const { instanceOf, isLoading: isInstanceOfLoading } = useWikidataInstanceOf(entityIds);
 	const classificationIdsByEntityId = useMemo(() => {
 		const map: Record<string, string[]> = {};
-		uniqueReactions.forEach(({ entityId, event }) => {
-			const ids = new Set(map[entityId] ?? []);
-			event.tags.forEach(([key, value]) => {
-				if (key !== "l" || typeof value !== "string") return;
-				if (!value.startsWith("wdt:P31 ")) return;
-				const id = stripWikidataPrefix(value.replace("wdt:P31 ", "").trim());
-				if (id) ids.add(id);
-			});
-			if (ids.size > 0) {
-				map[entityId] = Array.from(ids);
+		entityIds.forEach((entityId) => {
+			const ids = instanceOf[entityId] ?? [];
+			if (ids.length) {
+				map[entityId] = ids.map(stripWikidataPrefix).filter(Boolean);
 			}
 		});
 		return map;
-	}, [uniqueReactions]);
+	}, [entityIds, instanceOf]);
 
 	const classificationIds = useMemo(() => {
 		const ids = new Set<string>();
@@ -340,10 +336,12 @@ export default function UserPage({ npub }: UserPageProps) {
 						}),
 					)}
 					isClassificationLoading={
-						isLoading &&
-						(classificationIdsByEntityId[item.entityId] ?? []).some(
-							(id) => !summaries[id],
-						)
+						(isInstanceOfLoading &&
+							(classificationIdsByEntityId[item.entityId] ?? []).length === 0) ||
+						(isLoading &&
+							(classificationIdsByEntityId[item.entityId] ?? []).some(
+								(id) => !summaries[id],
+							))
 					}
 					onClassificationClick={(id) =>
 						setSelectedClassification((prev) => (prev === id ? null : id))
