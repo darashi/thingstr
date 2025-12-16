@@ -111,7 +111,6 @@ const thingRoute = createRoute({
 			error,
 			isLabelMissing,
 			isDescriptionMissing,
-			instanceOfIds,
 		} = useWikidataEntity(id, {
 			language,
 		});
@@ -161,7 +160,7 @@ const thingRoute = createRoute({
 					</div>
 				</div>
 
-				<ReactionsCard entityId={id} instanceOfIds={instanceOfIds} />
+				<ReactionsCard entityId={id} />
 
 				{error ? null : (
 					<div className="card bg-base-100 shadow-sm rounded-md">

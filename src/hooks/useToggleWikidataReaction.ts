@@ -16,7 +16,6 @@ type StarEventTemplate = {
 interface UseToggleWikidataReactionOptions {
 	entityId: string;
 	lastReactionEventId: string | null;
-	instanceOfIds?: string[];
 	onStar?: (eventId: string | null, pubkey: string | null) => void;
 	onUnstar?: () => void;
 }
@@ -24,7 +23,6 @@ interface UseToggleWikidataReactionOptions {
 export function useToggleWikidataReaction({
 	entityId,
 	lastReactionEventId,
-	instanceOfIds,
 	onStar,
 	onUnstar,
 }: UseToggleWikidataReactionOptions) {
@@ -49,32 +47,12 @@ export function useToggleWikidataReaction({
 			signEvent: (template: StarEventTemplate) => window.nostr!.signEvent!(template),
 		} as never);
 
-		const uniqueInstanceOfIds = Array.from(
-			new Set(
-				(instanceOfIds ?? [])
-					.map((id) => id.trim())
-					.filter((id) => id.length > 0),
-			),
-		);
-
-		const classificationTags: string[][] =
-			uniqueInstanceOfIds.length > 0
-				? [
-						["L", "wikidata:P31"],
-						...uniqueInstanceOfIds.map((id) => [
-							"l",
-							`wdt:P31 ${withWikidataPrefix(id)}`,
-						]),
-				  ]
-				: [];
-
 		const draft = await factory.build({
 			kind: 17,
 			content: "+",
 			tags: [
 				["k", "wikidata"],
 				["i", withWikidataPrefix(entityId)],
-				...classificationTags,
 			],
 		});
 
@@ -89,7 +67,7 @@ export function useToggleWikidataReaction({
 		}
 		onStar?.(signed.id ?? null, signed.pubkey ?? null);
 		return signed;
-	}, [entityId, eventStore, instanceOfIds, onStar, relayPool, session?.pubkey]);
+	}, [entityId, eventStore, onStar, relayPool, session?.pubkey]);
 
 	const createDeleteEvent = useCallback(async () => {
 		if (!session?.pubkey) {

@@ -13,19 +13,14 @@ import { withWikidataPrefix } from "../lib/wikidata";
 
 interface ReactionsCardProps {
 	entityId: string;
-	instanceOfIds?: string[];
 }
 
-export default function ReactionsCard({
-	entityId,
-	instanceOfIds,
-}: ReactionsCardProps) {
+export default function ReactionsCard({ entityId }: ReactionsCardProps) {
 	const { session } = useNip07Auth();
 	const { isStarred, lastReactionEventId } = useWikidataReactions(entityId);
 	const { toggle, isSaving } = useToggleWikidataReaction({
 		entityId,
 		lastReactionEventId,
-		instanceOfIds,
 	});
 	const reactions = useWikidataReactionsTimeline();
 	const eventStore = useEventStore();
