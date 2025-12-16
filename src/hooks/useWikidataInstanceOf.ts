@@ -19,6 +19,8 @@ interface WikidataEntityResponse {
 	entities: Record<string, WikidataEntity>;
 }
 
+const CLASSIFICATION_PROPERTIES = ["P31", "P279"] as const;
+
 export interface WikidataInstanceOfResult {
 	instanceOf: Record<string, string[]>;
 	isLoading: boolean;
@@ -78,13 +80,15 @@ export function useWikidataInstanceOf(ids: string[]): WikidataInstanceOfResult {
 				const data = (await response.json()) as WikidataEntityResponse;
 				for (const entityId of chunk) {
 					const entity = data.entities?.[entityId];
-					const claims = entity?.claims?.P31 ?? [];
 					const ids = new Set<string>();
-					claims.forEach((claim) => {
-						const value = claim.mainsnak.datavalue;
-						if (value?.type !== "wikibase-entityid") return;
-						if (!isWikibaseEntityValue(value.value)) return;
-						ids.add(value.value.id);
+					CLASSIFICATION_PROPERTIES.forEach((property) => {
+						const claims = entity?.claims?.[property] ?? [];
+						claims.forEach((claim) => {
+							const value = claim.mainsnak.datavalue;
+							if (value?.type !== "wikibase-entityid") return;
+							if (!isWikibaseEntityValue(value.value)) return;
+							ids.add(value.value.id);
+						});
 					});
 					map[entityId] = Array.from(ids);
 				}
