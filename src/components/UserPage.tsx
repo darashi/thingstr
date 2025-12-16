@@ -212,7 +212,11 @@ export default function UserPage({ npub }: UserPageProps) {
 		() => Array.from(new Set(uniqueReactions.map((item) => item.entityId))),
 		[uniqueReactions],
 	);
-	const { instanceOf, isLoading: isInstanceOfLoading } = useWikidataInstanceOf(entityIds);
+	const {
+		instanceOf,
+		isLoading: isInstanceOfLoading,
+		error: instanceOfError,
+	} = useWikidataInstanceOf(entityIds);
 	const classificationIdsByEntityId = useMemo(() => {
 		const map: Record<string, string[]> = {};
 		entityIds.forEach((entityId) => {
@@ -275,6 +279,8 @@ export default function UserPage({ npub }: UserPageProps) {
 
 	const displayNpub = normalizedPubkey ? encodeNpub(normalizedPubkey) : null;
 	const titleSubject = name ?? displayNpub ?? npub ?? null;
+	const isClassificationSectionVisible =
+		isInstanceOfLoading || classificationSummary.length > 0;
 
 	useEffect(() => {
 		const baseTitle = "thingstr";
@@ -366,7 +372,7 @@ export default function UserPage({ npub }: UserPageProps) {
 				</div>
 			</div>
 
-			{classificationSummary.length ? (
+			{isClassificationSectionVisible ? (
 				<div className="space-y-2">
 					<div className="flex items-center gap-2 text-base font-semibold">
 						<IconTags size={18} /> Classifications
@@ -388,37 +394,54 @@ export default function UserPage({ npub }: UserPageProps) {
 									</button>
 								</div>
 							) : null}
-							<div className="flex flex-wrap gap-2">
-								{visibleClassificationSummary.map(({ id, count }) => (
-									<button
-										key={id}
-										className={`px-3 py-2 rounded-md bg-base-200 text-sm text-base-content/80 inline-flex items-center gap-2 cursor-pointer hover:bg-base-300 transition-colors ${
-											selectedClassification === id ? "ring-2 ring-primary/60" : ""
-										}`}
-										onClick={() =>
-											setSelectedClassification((prev) =>
-												prev === id ? null : id,
-											)
-										}
-									>
-										<span className="font-medium">
-											{summaries[id]?.label ?? id}
-										</span>
-										<span className="text-xs px-2 py-0.5 rounded bg-base-300 text-base-content/80">
-											{count}
-										</span>
-									</button>
-								))}
-							</div>
-							{classificationSummary.length > 7 ? (
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs"
-									onClick={() => setShowAllClassifications((prev) => !prev)}
-								>
-									{showAllClassifications ? "Show less" : "Show all"}
-								</button>
+							{instanceOfError ? (
+								<div className="text-sm text-error">{instanceOfError}</div>
 							) : null}
+							{isInstanceOfLoading ? (
+								<div className="flex flex-wrap gap-2">
+									<div className="skeleton h-8 w-24" />
+									<div className="skeleton h-8 w-24" />
+									<div className="skeleton h-8 w-20" />
+								</div>
+							) : classificationSummary.length ? (
+								<>
+									<div className="flex flex-wrap gap-2">
+										{visibleClassificationSummary.map(({ id, count }) => (
+											<button
+												key={id}
+												className={`px-3 py-2 rounded-md bg-base-200 text-sm text-base-content/80 inline-flex items-center gap-2 cursor-pointer hover:bg-base-300 transition-colors ${
+													selectedClassification === id ? "ring-2 ring-primary/60" : ""
+												}`}
+												onClick={() =>
+													setSelectedClassification((prev) =>
+														prev === id ? null : id,
+													)
+												}
+											>
+												<span className="font-medium">
+													{summaries[id]?.label ?? id}
+												</span>
+												<span className="text-xs px-2 py-0.5 rounded bg-base-300 text-base-content/80">
+													{count}
+												</span>
+											</button>
+										))}
+									</div>
+									{classificationSummary.length > 7 ? (
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs"
+											onClick={() => setShowAllClassifications((prev) => !prev)}
+										>
+											{showAllClassifications ? "Show less" : "Show all"}
+										</button>
+									) : null}
+								</>
+							) : (
+								<p className="text-sm text-base-content/60">
+									No classifications yet
+								</p>
+							)}
 						</div>
 					</div>
 				</div>
