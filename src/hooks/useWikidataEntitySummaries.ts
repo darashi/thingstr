@@ -44,6 +44,7 @@ export function useWikidataEntitySummaries(
 	options: UseWikidataEntitySummariesOptions = {},
 ): WikidataEntitySummariesResult {
 	const { language = "en" } = options;
+	const metaCache = useMemo(() => getEntityMetaCache(language), [language]);
 	const normalizedIds = useMemo(
 		() =>
 			Array.from(
@@ -56,6 +57,20 @@ export function useWikidataEntitySummaries(
 		() => ["wikidata-entity-summaries", normalizedIds, language] as const,
 		[normalizedIds, language],
 	);
+
+	const placeholderData = useMemo(() => {
+		const summaries: Record<string, EntitySummary> = {};
+		normalizedIds.forEach((id) => {
+			const cached = metaCache[id];
+			if (cached) {
+				summaries[id] = {
+					label: cached.label,
+					description: cached.description,
+				};
+			}
+		});
+		return Object.keys(summaries).length ? summaries : undefined;
+	}, [metaCache, normalizedIds]);
 
 	const query = useQuery<
 		Record<string, EntitySummary>,
@@ -133,6 +148,7 @@ export function useWikidataEntitySummaries(
 
 			return summaries;
 		},
+		placeholderData,
 	});
 
 	const isLoading = normalizedIds.length
