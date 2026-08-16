@@ -27,7 +27,6 @@ export function useWikidataReactionsTimeline(): WikidataReactionItem[] {
 		}),
 		[],
 	);
-	const deleteFilter = useMemo(() => ({ kinds: [5] }), []);
 
 	const [reactions, setReactions] = useState<ReactionEvent[]>(() => {
 		if (typeof eventStore.getByFilters === "function") {
@@ -41,18 +40,6 @@ export function useWikidataReactionsTimeline(): WikidataReactionItem[] {
 		return [];
 	});
 
-	const [deletedIds, setDeletedIds] = useState<Set<string>>(() => {
-		if (typeof eventStore.getByFilters === "function") {
-			const existingDeletes = eventStore.getByFilters(
-				deleteFilter,
-			) as ReactionEvent[] | undefined;
-			if (Array.isArray(existingDeletes)) {
-				return extractDeletedIds(existingDeletes);
-			}
-		}
-		return new Set();
-	});
-
 	useEffect(() => {
 		const sub = eventStore.timeline(reactionFilter).subscribe((events) => {
 			setReactions(events ?? []);
@@ -61,24 +48,8 @@ export function useWikidataReactionsTimeline(): WikidataReactionItem[] {
 		return () => sub.unsubscribe();
 	}, [eventStore, reactionFilter]);
 
-	useEffect(() => {
-		const deleteSub = eventStore.filters(deleteFilter).subscribe((event) => {
-			if (!event?.tags) return;
-			const ids = extractDeletedIds([event]);
-			if (ids.size === 0) return;
-			setDeletedIds((prev) => {
-				const next = new Set(prev);
-				ids.forEach((id) => next.add(id));
-				return next;
-			});
-		});
-
-		return () => deleteSub.unsubscribe();
-	}, [deleteFilter, eventStore]);
-
 	const filtered = useMemo(() => {
 		const items = reactions
-			.filter((event) => !deletedIds.has(event.id))
 			.map((event) => {
 				const entityTag = event.tags.find(
 					([key, value]) => key === "i" && typeof value === "string",
@@ -99,19 +70,7 @@ export function useWikidataReactionsTimeline(): WikidataReactionItem[] {
 		return items.sort(
 			(a, b) => (b?.event?.created_at ?? 0) - (a?.event?.created_at ?? 0),
 		);
-	}, [deletedIds, reactions]);
+	}, [reactions]);
 
 	return filtered;
-}
-
-function extractDeletedIds(events: ReactionEvent[]): Set<string> {
-	const ids = new Set<string>();
-	events.forEach((event) => {
-		event.tags.forEach(([key, value]) => {
-			if (key === "e" && typeof value === "string") {
-				ids.add(value);
-			}
-		});
-	});
-	return ids;
 }

@@ -1,4 +1,4 @@
-import { EventFactory } from "applesauce-factory";
+import type { EventTemplate } from "nostr-tools";
 import { useCallback, useState } from "react";
 import { useNip07Auth } from "./useNip07Auth";
 import { useEventStore } from "./useEventStore";
@@ -6,10 +6,7 @@ import { useRelayPool } from "./useRelayPool";
 import { THINGSTR_RELAYS } from "../config/relays";
 import { withWikidataPrefix } from "../lib/wikidata/ids";
 
-type Nip07EventTemplate = {
-	kind: number;
-	content: string;
-	tags: string[][];
+type Nip07EventTemplate = Omit<EventTemplate, "created_at"> & {
 	created_at?: number;
 };
 
@@ -29,20 +26,15 @@ export function useToggleWikidataReaction({
 
 	const createAndPublishEvent = useCallback(
 		async (template: Nip07EventTemplate, publishErrorMessage: string) => {
-			if (!window.nostr?.getPublicKey || !window.nostr?.signEvent) {
+			if (!window.nostr) {
 				window.alert("NIP-07 signer not found.");
 				return null;
 			}
 
-			const factory = new EventFactory();
-			factory.setSigner({
-				getPublicKey: () => window.nostr!.getPublicKey!(),
-				signEvent: (eventTemplate: Nip07EventTemplate) =>
-					window.nostr!.signEvent!(eventTemplate),
-			} as never);
-
-			const draft = await factory.build(template);
-			const signed = await factory.sign(draft);
+			const signed = await window.nostr.signEvent({
+				...template,
+				created_at: template.created_at ?? Math.floor(Date.now() / 1000),
+			});
 			eventStore.add(signed);
 			try {
 				if (THINGSTR_RELAYS.length) {

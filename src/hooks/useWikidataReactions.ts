@@ -19,6 +19,11 @@ type ReactionFilter = {
 	authors?: string[];
 };
 
+type ReactionState = {
+	trackingKey: string;
+	events: Map<string, number>;
+};
+
 export function useWikidataReactions(
 	entityId: string,
 	{ pubkey: targetPubkey }: UseWikidataReactionsOptions = {},
@@ -39,79 +44,64 @@ export function useWikidataReactions(
 		}),
 		[prefixedEntityId, pubkeyToTrack],
 	);
-
-	const [lastReactionEventId, setLastReactionEventId] = useState<string | null>(
+	const trackingKey = `${pubkeyToTrack ?? ""}:${prefixedEntityId}`;
+	const [reactionState, setReactionState] = useState<ReactionState | null>(
 		null,
 	);
-	const [isStarred, setIsStarred] = useState(false);
-	const [reactionIds, setReactionIds] = useState<Set<string>>(new Set());
 
 	useEffect(() => {
-		setLastReactionEventId(null);
-		setIsStarred(false);
-		setReactionIds(new Set());
-
 		if (!pubkeyToTrack) return;
 
-		// hydrate existing reactions
-		if (typeof eventStore.getByFilters === "function") {
-			const existing = eventStore.getByFilters(filter) as
-				| Array<{ created_at?: number; pubkey?: string; id?: string }>
-				| undefined;
-			if (Array.isArray(existing) && existing.length) {
-				const ids = new Set<string>();
-				const latest = existing.reduce((prev, current) => {
-					if (!prev) return current;
-					return (current.created_at ?? 0) > (prev.created_at ?? 0)
-						? current
-						: prev;
-				});
-				existing.forEach((ev) => {
-					if (ev.id) ids.add(ev.id);
-				});
-				setReactionIds(ids);
-				setLastReactionEventId(latest.id ?? null);
-				setIsStarred(true);
+		const sub = eventStore.filters(filter).subscribe((event) => {
+			if (event.pubkey !== pubkeyToTrack) return;
+			setReactionState((current) => {
+				const events =
+					current?.trackingKey === trackingKey
+						? new Map(current.events)
+						: new Map<string, number>();
+				if (events.get(event.id) === event.created_at) return current;
+				events.set(event.id, event.created_at);
+				return { trackingKey, events };
+			});
+		});
+
+		const removeSub = eventStore.remove$.subscribe((event) => {
+			setReactionState((current) => {
+				if (current?.trackingKey !== trackingKey) return current;
+				if (!current.events.has(event.id)) return current;
+				const events = new Map(current.events);
+				events.delete(event.id);
+				return { trackingKey, events };
+			});
+		});
+
+		return () => {
+			sub.unsubscribe();
+			removeSub.unsubscribe();
+		};
+	}, [eventStore, filter, pubkeyToTrack, trackingKey]);
+
+	return useMemo(() => {
+		if (reactionState?.trackingKey !== trackingKey) {
+			return { isStarred: false, lastReactionEventId: null };
+		}
+
+		let lastReactionEventId: string | null = null;
+		let lastReactionTimestamp = Number.NEGATIVE_INFINITY;
+		for (const [eventId, createdAt] of reactionState.events) {
+			if (
+				createdAt > lastReactionTimestamp ||
+				(createdAt === lastReactionTimestamp &&
+					(lastReactionEventId === null || eventId < lastReactionEventId))
+			) {
+				lastReactionEventId = eventId;
+				lastReactionTimestamp = createdAt;
 			}
 		}
 
-		const sub = eventStore.filters(filter).subscribe((event) => {
-			if (event?.pubkey !== pubkeyToTrack) return;
-			setLastReactionEventId(event.id ?? null);
-			setIsStarred(true);
-			if (event.id) {
-				setReactionIds((prev) => {
-					const next = new Set(prev);
-					next.add(event.id as string);
-					return next;
-				});
-			}
-		});
-
-		return () => sub.unsubscribe();
-	}, [eventStore, filter, pubkeyToTrack]);
-
-	// watch deletions (kind 5) that reference known reaction ids
-	useEffect(() => {
-		const deleteSub = eventStore.filters({ kinds: [5] }).subscribe((event) => {
-			if (!event?.tags) return;
-			const deletedId = event.tags.find(([key]) => key === "e")?.[1];
-			if (deletedId && reactionIds.has(deletedId)) {
-				setReactionIds((prev) => {
-					const next = new Set(prev);
-					next.delete(deletedId);
-					return next;
-				});
-				if (lastReactionEventId === deletedId) {
-					setIsStarred(false);
-					setLastReactionEventId(null);
-				}
-			}
-		});
-		return () => deleteSub.unsubscribe();
-		// Intentionally not including reactionIds in deps to avoid re-subscribing frequently
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [eventStore, lastReactionEventId]);
-
-	return { isStarred, lastReactionEventId };
+		return {
+			isStarred: reactionState.events.size > 0,
+			lastReactionEventId,
+		};
+	}, [reactionState, trackingKey]);
 }

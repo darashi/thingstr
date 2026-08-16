@@ -52,7 +52,7 @@ export default function SearchBar({ className }: SearchBarProps) {
 					setIsDropdownOpen(true);
 				}}
 				onFocus={() => setIsDropdownOpen(true)}
-				className="input input-bordered w-full pl-10"
+				className="input w-full pl-10"
 			/>
 			<IconSearch
 				size={20}

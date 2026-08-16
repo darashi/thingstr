@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import type { WindowNostr } from "nostr-tools/nip07";
 import { normalizePubkey } from "../lib/nostr";
 
 declare global {
 	interface Window {
-		nostr?: {
-			getPublicKey?: () => Promise<string>;
-			signEvent?: (event: unknown) => Promise<unknown>;
-		};
+		nostr?: WindowNostr;
 	}
 }
 
