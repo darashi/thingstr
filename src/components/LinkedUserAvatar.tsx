@@ -4,6 +4,7 @@ import { IconUser } from "@tabler/icons-react";
 import { useProfile } from "../hooks/useProfile";
 import { encodeNpub, normalizePubkey } from "../lib/nostr";
 import { useNip07Auth } from "../hooks/useNip07Auth";
+import { isLikeReaction, reactionSymbol } from "../lib/reactions";
 
 type ProfileEvent = {
 	kind: number;
@@ -16,6 +17,7 @@ type BaseProps = {
 	showRing?: boolean;
 	iconSize?: number;
 	isFollowing?: boolean;
+	reactionContent?: string;
 };
 
 type LinkedUserAvatarProps =
@@ -44,6 +46,7 @@ export default function LinkedUserAvatar(props: LinkedUserAvatarProps) {
 	const showRing = props.showRing ?? true;
 	const iconSize = props.iconSize ?? 18;
 	const isFollowing = props.isFollowing ?? false;
+	const reactionContent = props.reactionContent;
 	const { pubkey: viewerPubkey } = useNip07Auth();
 
 	const isProfileEventProps = "profileEvent" in props;
@@ -83,30 +86,43 @@ export default function LinkedUserAvatar(props: LinkedUserAvatarProps) {
 	const ringClassName = showRing
 		? `ring ${ringColorClass} ring-offset-1 ring-offset-base-100`
 		: "";
+	const symbol = reactionContent ? reactionSymbol(reactionContent) : null;
+	const isLike = reactionContent ? isLikeReaction(reactionContent) : false;
 
 	return (
 		<Link
 			to="/p/$npub"
 			params={{ npub: explicitNpub }}
 			className="inline-flex"
+			aria-label={symbol ? `User profile · ${symbol} reaction` : undefined}
 		>
-			<div className="avatar">
-				<div
-					className={`${sizeClassName} rounded-full overflow-hidden bg-base-200 ${ringClassName}`}
-				>
-					{displayPicture ? (
-						<img
-							src={displayPicture}
-							alt="User avatar"
-							className="w-full h-full object-cover"
-						/>
-					) : (
-						<div className="flex h-full w-full items-center justify-center bg-primary/20 text-primary-content">
-							<IconUser size={iconSize} />
-						</div>
-					)}
-				</div>
-			</div>
+			<span className={symbol ? "indicator" : "inline-flex"}>
+				{symbol ? (
+					<span
+							className={`indicator-item indicator-end indicator-bottom z-10 grid h-4 min-w-4 place-items-center rounded-full border border-base-300 bg-base-100 px-0.5 text-xs leading-none shadow-sm ${isLike ? "font-bold text-primary" : ""}`}
+						aria-hidden="true"
+					>
+						{symbol}
+					</span>
+				) : null}
+				<span className="avatar">
+					<span
+						className={`${sizeClassName} rounded-full overflow-hidden bg-base-200 ${ringClassName}`}
+					>
+						{displayPicture ? (
+							<img
+								src={displayPicture}
+								alt="User avatar"
+								className="w-full h-full object-cover"
+							/>
+						) : (
+							<span className="flex h-full w-full items-center justify-center bg-primary/20 text-primary-content">
+								<IconUser size={iconSize} />
+							</span>
+						)}
+					</span>
+				</span>
+			</span>
 		</Link>
 	);
 }

@@ -12,3 +12,11 @@ export function stripWikidataPrefix(value: string): string {
 	if (value.startsWith("wd:")) return value.slice(3);
 	return value;
 }
+
+const WIKIDATA_EXTERNAL_ID_PATTERN = /^(?:wd:(Q\d+)|wdt:(P\d+))$/i;
+
+export function parseWikidataExternalId(value: string): string | null {
+	const match = WIKIDATA_EXTERNAL_ID_PATTERN.exec(value.trim());
+	const entityId = match?.[1] ?? match?.[2];
+	return entityId ? entityId.toUpperCase() : null;
+}

@@ -1,12 +1,9 @@
 import { useEffect } from "react";
 import { THINGSTR_RELAYS } from "../config/relays";
+import { ingestRelayEvent } from "../lib/reactionEventStore";
+import { buildThingstrReactionFilters } from "../lib/reactionFilters";
 import { useEventStore } from "./useEventStore";
 import { useRelayPool } from "./useRelayPool";
-
-const REACTION_FILTERS = [
-	{ kinds: [17], "#k": ["wikidata"], limit: 500 },
-	{ kinds: [5], limit: 500 },
-];
 
 export function useThingstrReactionsSubscription() {
 	const eventStore = useEventStore();
@@ -16,9 +13,19 @@ export function useThingstrReactionsSubscription() {
 		if (!THINGSTR_RELAYS.length) return;
 
 		const group = relayPool.group(THINGSTR_RELAYS);
+		const filters = buildThingstrReactionFilters();
+		const relayOptions = {
+			eventStore: null,
+			reconnect: Infinity,
+			resubscribe: { delay: 1_000 },
+		};
+		const handleEvent = (event: unknown) => {
+			ingestRelayEvent(eventStore, event);
+		};
 		const requestSub = group
-			.request(REACTION_FILTERS, { eventStore })
+			.request(filters, relayOptions)
 			.subscribe({
+				next: handleEvent,
 				error: (error) =>
 					console.error(
 						"Failed to request reactions from THINGSTR relays",
@@ -27,8 +34,9 @@ export function useThingstrReactionsSubscription() {
 			});
 
 		const liveSub = group
-			.subscription(REACTION_FILTERS, { eventStore })
+			.subscription(filters, relayOptions)
 			.subscribe({
+				next: handleEvent,
 				error: (error) =>
 					console.error(
 						"Failed to subscribe to reactions from THINGSTR relays",

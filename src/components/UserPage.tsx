@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { IconStar } from "@tabler/icons-react";
+import { IconMoodPlus } from "@tabler/icons-react";
 import { useBrowserLanguage } from "../hooks/useBrowserLanguage";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useNip07Auth } from "../hooks/useNip07Auth";
@@ -131,7 +131,7 @@ export default function UserPage({ npub }: UserPageProps) {
 
 			<div className="space-y-3">
 				<div className="flex items-center gap-2 text-base font-semibold">
-					<IconStar size={18} /> Latest reactions
+					<IconMoodPlus size={18} /> Latest reactions
 				</div>
 				{error ? <div className="text-sm text-error">{error}</div> : null}
 				{content}

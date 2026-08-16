@@ -3,10 +3,9 @@ import { IconDotsVertical, IconTags } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
 import type { EntitySummary } from "../hooks/useWikidataEntitySummaries";
 import { useToggleWikidataReaction } from "../hooks/useToggleWikidataReaction";
-import { useWikidataReactions } from "../hooks/useWikidataReactions";
 import type { WikidataReactionItem } from "../hooks/useWikidataReactionsTimeline";
+import { isLikeReaction, reactionSymbol } from "../lib/reactions";
 import IdBadge from "./IdBadge";
-import StarToggle from "./StarToggle";
 
 interface UserReactionEntryProps {
 	item: WikidataReactionItem;
@@ -30,19 +29,20 @@ export default function UserReactionEntry({
 	selectedClassification,
 }: UserReactionEntryProps) {
 	const { event, entityId } = item;
-	const { isStarred } = useWikidataReactions(entityId, {
-		pubkey: event.pubkey,
-	});
-	const { toggle, isSaving } = useToggleWikidataReaction({
-		entityId,
-		lastReactionEventId: event.id,
-	});
+	const { toggle, isSaving } = useToggleWikidataReaction(entityId);
 	const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const symbol = reactionSymbol(item.content);
+	const isLike = isLikeReaction(item.content);
 
 	const handleToggle = () => {
 		if (!canToggle) return;
-		void toggle(isStarred);
+		void toggle(item.content).catch((error: unknown) => {
+			console.error("Failed to remove Wikidata reaction", error);
+			window.alert(
+				"Failed to remove the reaction. Check your Nostr signer and relay connection.",
+			);
+		});
 	};
 
 	const labelClassName = summary?.label
@@ -55,14 +55,27 @@ export default function UserReactionEntry({
 		<div className="card bg-base-100 shadow-sm rounded-md">
 			<div className="card-body py-3 px-4">
 				<div className="flex gap-3 items-start">
-					<StarToggle
-						isStarred={isStarred}
-						isSaving={isSaving}
-						onToggle={handleToggle}
-						size={22}
-						confirmUnstarMessage="Remove your star from this thing?"
-						isReadOnly={!canToggle}
-					/>
+					<button
+						type="button"
+						className={`btn btn-ghost btn-circle text-xl ${isLike ? "font-bold text-primary" : ""} ${canToggle ? "" : "cursor-default"}`}
+						onClick={handleToggle}
+						disabled={isSaving}
+						aria-label={
+							canToggle
+								? `Remove ${symbol} reaction`
+								: `${symbol} reaction`
+						}
+						aria-disabled={!canToggle || undefined}
+						aria-busy={isSaving}
+						tabIndex={canToggle ? undefined : -1}
+						title={canToggle ? `Remove ${symbol} reaction` : `${symbol} reaction`}
+					>
+						{isSaving ? (
+							<span className="loading loading-spinner loading-xs" />
+						) : (
+							symbol
+						)}
+					</button>
 					<div className="flex flex-1 flex-col gap-2">
 						<div className="flex flex-wrap items-center gap-2">
 							{isSummaryLoading ? (

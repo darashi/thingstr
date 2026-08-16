@@ -1,107 +1,67 @@
-import { useEffect, useMemo, useState } from "react";
-import { useEventStore } from "./useEventStore";
+import { useCallback, useContext, useMemo } from "react";
+import { normalizePubkey } from "../lib/nostr";
+import { normalizeReactionContent } from "../lib/reactions";
+import { WikidataReactionsContext } from "../providers/wikidataReactionsContext";
+import type { WikidataReaction } from "../providers/wikidataReactionsContext";
 import { useNip07Auth } from "./useNip07Auth";
-import { withWikidataPrefix } from "../lib/wikidata/ids";
+
+const EMPTY_REACTIONS: WikidataReaction[] = [];
 
 interface UseWikidataReactionsResult {
-	isStarred: boolean;
-	lastReactionEventId: string | null;
+	hasReaction: (content: string) => boolean;
+	reactionContents: string[];
+	getReactionEventIds: (content: string) => string[];
 }
 
 type UseWikidataReactionsOptions = {
 	pubkey?: string | null;
 };
 
-type ReactionFilter = {
-	kinds: number[];
-	"#i": string[];
-	"#k": string[];
-	authors?: string[];
-};
-
-type ReactionState = {
-	trackingKey: string;
-	events: Map<string, number>;
-};
-
 export function useWikidataReactions(
 	entityId: string,
 	{ pubkey: targetPubkey }: UseWikidataReactionsOptions = {},
 ): UseWikidataReactionsResult {
-	const eventStore = useEventStore();
+	const value = useContext(WikidataReactionsContext);
+	if (!value) {
+		throw new Error(
+			"WikidataReactionsProvider is missing in the component tree.",
+		);
+	}
 	const { pubkey } = useNip07Auth();
-	const pubkeyToTrack = targetPubkey ?? pubkey;
-	const prefixedEntityId = useMemo(
-		() => withWikidataPrefix(entityId),
-		[entityId],
-	);
-	const filter = useMemo(
-		(): ReactionFilter => ({
-			kinds: [17],
-			"#i": [prefixedEntityId],
-			"#k": ["wikidata"],
-			...(pubkeyToTrack ? { authors: [pubkeyToTrack] } : {}),
-		}),
-		[prefixedEntityId, pubkeyToTrack],
-	);
-	const trackingKey = `${pubkeyToTrack ?? ""}:${prefixedEntityId}`;
-	const [reactionState, setReactionState] = useState<ReactionState | null>(
-		null,
-	);
+	const pubkeyToTrack = normalizePubkey(targetPubkey ?? pubkey ?? "");
+	const reactions = value.byEntityId.get(entityId) ?? EMPTY_REACTIONS;
 
-	useEffect(() => {
-		if (!pubkeyToTrack) return;
+	const eventIdsByContent = useMemo(() => {
+		const byContent = new Map<string, string[]>();
+		if (!pubkeyToTrack) return byContent;
 
-		const sub = eventStore.filters(filter).subscribe((event) => {
-			if (event.pubkey !== pubkeyToTrack) return;
-			setReactionState((current) => {
-				const events =
-					current?.trackingKey === trackingKey
-						? new Map(current.events)
-						: new Map<string, number>();
-				if (events.get(event.id) === event.created_at) return current;
-				events.set(event.id, event.created_at);
-				return { trackingKey, events };
-			});
-		});
-
-		const removeSub = eventStore.remove$.subscribe((event) => {
-			setReactionState((current) => {
-				if (current?.trackingKey !== trackingKey) return current;
-				if (!current.events.has(event.id)) return current;
-				const events = new Map(current.events);
-				events.delete(event.id);
-				return { trackingKey, events };
-			});
-		});
-
-		return () => {
-			sub.unsubscribe();
-			removeSub.unsubscribe();
-		};
-	}, [eventStore, filter, pubkeyToTrack, trackingKey]);
-
-	return useMemo(() => {
-		if (reactionState?.trackingKey !== trackingKey) {
-			return { isStarred: false, lastReactionEventId: null };
+		for (const reaction of reactions) {
+			const reactionPubkey =
+				normalizePubkey(reaction.pubkey) ?? reaction.pubkey;
+			if (reactionPubkey !== pubkeyToTrack) continue;
+			const content = normalizeReactionContent(reaction.content);
+			const ids = byContent.get(content) ?? [];
+			ids.push(reaction.event.id);
+			byContent.set(content, ids);
 		}
+		return byContent;
+	}, [pubkeyToTrack, reactions]);
 
-		let lastReactionEventId: string | null = null;
-		let lastReactionTimestamp = Number.NEGATIVE_INFINITY;
-		for (const [eventId, createdAt] of reactionState.events) {
-			if (
-				createdAt > lastReactionTimestamp ||
-				(createdAt === lastReactionTimestamp &&
-					(lastReactionEventId === null || eventId < lastReactionEventId))
-			) {
-				lastReactionEventId = eventId;
-				lastReactionTimestamp = createdAt;
-			}
-		}
+	const hasReaction = useCallback(
+		(content: string) =>
+			eventIdsByContent.has(normalizeReactionContent(content)),
+		[eventIdsByContent],
+	);
+	const getReactionEventIds = useCallback(
+		(content: string) => [
+			...(eventIdsByContent.get(normalizeReactionContent(content)) ?? []),
+		],
+		[eventIdsByContent],
+	);
+	const reactionContents = useMemo(
+		() => [...eventIdsByContent.keys()],
+		[eventIdsByContent],
+	);
 
-		return {
-			isStarred: reactionState.events.size > 0,
-			lastReactionEventId,
-		};
-	}, [reactionState, trackingKey]);
+	return { hasReaction, reactionContents, getReactionEventIds };
 }

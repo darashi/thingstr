@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { WikidataReactionItem } from "./useWikidataReactionsTimeline";
 import { useWikidataInstanceOf } from "./useWikidataInstanceOf";
 import { stripWikidataPrefix } from "../lib/wikidata/ids";
+import { uniqueReactionItems } from "../lib/reactionItems";
 
 export interface ReactionClassificationSummary {
 	id: string;
@@ -16,14 +17,10 @@ export function useReactionClassifications(
 	>(null);
 	const [showAllClassifications, setShowAllClassifications] = useState(false);
 
-	const uniqueReactions = useMemo(() => {
-		const seen = new Set<string>();
-		return reactions.filter((item) => {
-			if (seen.has(item.event.id)) return false;
-			seen.add(item.event.id);
-			return true;
-		});
-	}, [reactions]);
+	const uniqueReactions = useMemo(
+		() => uniqueReactionItems(reactions),
+		[reactions],
+	);
 
 	const entityIds = useMemo(
 		() => Array.from(new Set(uniqueReactions.map((item) => item.entityId))),
@@ -66,7 +63,8 @@ export function useReactionClassifications(
 
 	const classificationSummary = useMemo(() => {
 		const counts: Record<string, number> = {};
-		Object.values(classificationIdsByEntityId).forEach((ids) => {
+		uniqueReactions.forEach(({ entityId }) => {
+			const ids = classificationIdsByEntityId[entityId] ?? [];
 			ids.forEach((id) => {
 				counts[id] = (counts[id] ?? 0) + 1;
 			});
@@ -74,7 +72,7 @@ export function useReactionClassifications(
 		return Object.entries(counts)
 			.map(([id, count]) => ({ id, count }))
 			.sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
-	}, [classificationIdsByEntityId]);
+	}, [classificationIdsByEntityId, uniqueReactions]);
 
 	const visibleClassificationSummary = useMemo(() => {
 		const limit = 7;

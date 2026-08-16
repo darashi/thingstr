@@ -1,6 +1,20 @@
 import { nip19 } from "nostr-tools";
+import {
+	validateEvent,
+	verifyEvent,
+	type NostrEvent,
+} from "nostr-tools/pure";
 
 const HEX_PUBKEY_REGEX = /^[0-9a-f]{64}$/i;
+
+export function isVerifiedNostrEvent(value: unknown): value is NostrEvent {
+	if (!validateEvent(value)) return false;
+	const event = value as Partial<NostrEvent>;
+	if (typeof event.id !== "string" || typeof event.sig !== "string") {
+		return false;
+	}
+	return verifyEvent(event as NostrEvent);
+}
 
 export function normalizePubkey(input: string): string | null {
 	const value = input.trim();
