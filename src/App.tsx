@@ -1,5 +1,4 @@
 import { Outlet } from "@tanstack/react-router";
-import "./App.css";
 import Navbar from "./components/Navbar";
 
 function App() {

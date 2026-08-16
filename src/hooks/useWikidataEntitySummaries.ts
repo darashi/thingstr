@@ -1,16 +1,10 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-
-const ENDPOINT = "https://www.wikidata.org/w/api.php";
-
-interface WikidataEntity {
-	labels?: Record<string, { value: string }>;
-	descriptions?: Record<string, { value: string }>;
-}
-
-interface WikidataEntityResponse {
-	entities: Record<string, WikidataEntity>;
-}
+import { useMemo } from "react";
+import { normalizeEntityIds } from "../lib/wikidata/api";
+import {
+	getCachedEntityMeta,
+	loadEntityMeta,
+} from "../lib/wikidata/entityMeta";
 
 interface UseWikidataEntitySummariesOptions {
 	language?: string;
@@ -27,50 +21,20 @@ export interface WikidataEntitySummariesResult {
 	error: string | null;
 }
 
-type EntityMeta = { label: string | null; description: string | null };
-type EntityMetaCache = Record<string, EntityMeta | undefined>;
-
-const entityMetaCacheByLanguage: Record<string, EntityMetaCache> = {};
-
-function getEntityMetaCache(language: string): EntityMetaCache {
-	if (!entityMetaCacheByLanguage[language]) {
-		entityMetaCacheByLanguage[language] = {};
-	}
-	return entityMetaCacheByLanguage[language];
-}
-
 export function useWikidataEntitySummaries(
 	ids: string[],
 	options: UseWikidataEntitySummariesOptions = {},
 ): WikidataEntitySummariesResult {
 	const { language = "en" } = options;
-	const metaCache = useMemo(() => getEntityMetaCache(language), [language]);
-	const normalizedIds = useMemo(
-		() =>
-			Array.from(
-				new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0)),
-			).sort(),
-		[ids],
-	);
-
+	const normalizedIds = useMemo(() => normalizeEntityIds(ids), [ids]);
 	const queryKey = useMemo(
 		() => ["wikidata-entity-summaries", normalizedIds, language] as const,
 		[normalizedIds, language],
 	);
-
 	const placeholderData = useMemo(() => {
-		const summaries: Record<string, EntitySummary> = {};
-		normalizedIds.forEach((id) => {
-			const cached = metaCache[id];
-			if (cached) {
-				summaries[id] = {
-					label: cached.label,
-					description: cached.description,
-				};
-			}
-		});
+		const summaries = getCachedSummaries(normalizedIds, language);
 		return Object.keys(summaries).length ? summaries : undefined;
-	}, [metaCache, normalizedIds]);
+	}, [normalizedIds, language]);
 
 	const query = useQuery<
 		Record<string, EntitySummary>,
@@ -84,69 +48,13 @@ export function useWikidataEntitySummaries(
 			const [, entityIds, languageCode] = key;
 			if (!entityIds.length) return {};
 
-			const languagesParam =
-				languageCode === "en" ? "en" : `${languageCode}|en`;
-			const metaCache = getEntityMetaCache(languageCode);
-
-			const unknownIds = entityIds.filter((id) => metaCache[id] === undefined);
-
-			const summaries: Record<string, EntitySummary> = {};
-			if (!unknownIds.length) {
-				entityIds.forEach((id) => {
-					summaries[id] = {
-						label: metaCache[id]?.label ?? null,
-						description: metaCache[id]?.description ?? null,
-					};
-				});
-				return summaries;
-			}
-
-			const chunks: string[][] = [];
-			for (let i = 0; i < unknownIds.length; i += 50) {
-				chunks.push(unknownIds.slice(i, i + 50));
-			}
-
-			for (const chunk of chunks) {
-				const params = new URLSearchParams({
-					action: "wbgetentities",
-					format: "json",
-					ids: chunk.join("|"),
-					origin: "*",
-					languages: languagesParam,
-					languagefallback: "1",
-					props: "labels|descriptions",
-				});
-
-				const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
-					signal,
-				});
-
-				if (!response.ok) {
-					throw new Error("Failed to load entity summaries");
-				}
-
-				const data = (await response.json()) as WikidataEntityResponse;
-				for (const [entityId, entity] of Object.entries(data.entities ?? {})) {
-					const label = pickLabel(entity.labels ?? {}, languageCode);
-					const description = pickLabel(entity.descriptions ?? {}, languageCode);
-					metaCache[entityId] = { label: label ?? null, description: description ?? null };
-				}
-
-				chunk.forEach((entityId) => {
-					if (metaCache[entityId] === undefined) {
-						metaCache[entityId] = { label: null, description: null };
-					}
-				});
-			}
-
-			entityIds.forEach((id) => {
-				summaries[id] = {
-					label: metaCache[id]?.label ?? null,
-					description: metaCache[id]?.description ?? null,
-				};
-			});
-
-			return summaries;
+			await loadEntityMeta(
+				entityIds,
+				languageCode,
+				"Failed to load entity summaries",
+				signal,
+			);
+			return getCachedSummaries(entityIds, languageCode);
 		},
 		placeholderData,
 	});
@@ -154,7 +62,6 @@ export function useWikidataEntitySummaries(
 	const isLoading = normalizedIds.length
 		? query.isPending || query.isFetching
 		: false;
-
 	const error =
 		query.error instanceof Error
 			? query.error.message
@@ -169,14 +76,19 @@ export function useWikidataEntitySummaries(
 	};
 }
 
-function pickLabel(
-	values: Record<string, { value: string }>,
-	languageCode: string,
-) {
-	return (
-		values[languageCode]?.value ??
-		values.en?.value ??
-		Object.values(values)[0]?.value ??
-		null
-	);
+function getCachedSummaries(
+	entityIds: readonly string[],
+	language: string,
+): Record<string, EntitySummary> {
+	const summaries: Record<string, EntitySummary> = {};
+	for (const entityId of entityIds) {
+		const cached = getCachedEntityMeta(language, entityId);
+		if (cached) {
+			summaries[entityId] = {
+				label: cached.label,
+				description: cached.description,
+			};
+		}
+	}
+	return summaries;
 }

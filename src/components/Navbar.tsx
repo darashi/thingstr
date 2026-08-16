@@ -1,5 +1,5 @@
 import { IconLogin, IconLogout, IconUser } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import SearchBar from "./SearchBar";
 import { useNip07Auth } from "../hooks/useNip07Auth";
@@ -7,17 +7,18 @@ import { useProfile } from "../hooks/useProfile";
 import { encodeNpub } from "../lib/nostr";
 
 export default function Navbar() {
-	const { session, isLoggingIn, login, logout, setProfilePicture } =
+	const { session, pubkey, isLoggingIn, login, logout, setProfilePicture } =
 		useNip07Auth();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
-	const pubkey = session?.pubkey ?? null;
 	const npubLink = pubkey ? (encodeNpub(pubkey) ?? pubkey) : null;
 	const { picture: profilePicture } = useProfile(pubkey);
 	const profileImage = session?.picture ?? profilePicture ?? null;
 
-	if (pubkey && profilePicture && session?.picture !== profilePicture) {
-		setProfilePicture(profilePicture);
-	}
+	useEffect(() => {
+		if (pubkey && profilePicture && session?.picture !== profilePicture) {
+			setProfilePicture(profilePicture);
+		}
+	}, [profilePicture, pubkey, session?.picture, setProfilePicture]);
 
 	return (
 		<div className="navbar bg-base-100 shadow-sm">

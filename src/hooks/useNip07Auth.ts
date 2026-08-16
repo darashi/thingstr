@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { normalizePubkey } from "../lib/nostr";
 
 declare global {
 	interface Window {
@@ -63,6 +64,7 @@ const subscribe = (listener: (value: Nip07Session | null) => void) => {
 export function useNip07Auth() {
 	const [session, setSession] = useState<Nip07Session | null>(currentSession);
 	const [isLoggingIn, setIsLoggingIn] = useState(false);
+	const pubkey = session?.pubkey ? normalizePubkey(session.pubkey) : null;
 
 	useEffect(() => subscribe(setSession), []);
 
@@ -107,6 +109,7 @@ export function useNip07Auth() {
 
 	return {
 		session,
+		pubkey,
 		isLoggingIn,
 		login,
 		logout,

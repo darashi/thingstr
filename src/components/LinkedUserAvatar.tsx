@@ -44,7 +44,7 @@ export default function LinkedUserAvatar(props: LinkedUserAvatarProps) {
 	const showRing = props.showRing ?? true;
 	const iconSize = props.iconSize ?? 18;
 	const isFollowing = props.isFollowing ?? false;
-	const { session } = useNip07Auth();
+	const { pubkey: viewerPubkey } = useNip07Auth();
 
 	const isProfileEventProps = "profileEvent" in props;
 	const npub = isProfileEventProps ? null : props.npub;
@@ -68,10 +68,6 @@ export default function LinkedUserAvatar(props: LinkedUserAvatarProps) {
 		return "";
 	}, [npub, profileEvent]);
 
-	const viewerPubkey = useMemo(
-		() => (session?.pubkey ? normalizePubkey(session.pubkey) : null),
-		[session?.pubkey],
-	);
 	const isViewer = Boolean(viewerPubkey && pubkey && viewerPubkey === pubkey);
 	const cachedPicture = useMemo(
 		() => (profileEvent ? extractPicture(profileEvent) : null),

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useEventStore } from "./useEventStore";
-import { stripWikidataPrefix } from "../lib/wikidata";
+import { stripWikidataPrefix } from "../lib/wikidata/ids";
 
 type ReactionEvent = {
 	id: string;

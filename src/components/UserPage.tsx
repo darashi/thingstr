@@ -1,278 +1,48 @@
-import { useEffect, useMemo, useState } from "react";
-import { IconDotsVertical, IconStar, IconTags } from "@tabler/icons-react";
-import { Link } from "@tanstack/react-router";
-import IdBadge from "./IdBadge";
-import UserHeader from "./UserHeader";
-import StarToggle from "./StarToggle";
+import { useMemo } from "react";
+import { IconStar } from "@tabler/icons-react";
 import { useBrowserLanguage } from "../hooks/useBrowserLanguage";
-import { useUserWikidataReactions } from "../hooks/useUserWikidataReactions";
-import {
-	type EntitySummary,
-	useWikidataEntitySummaries,
-} from "../hooks/useWikidataEntitySummaries";
-import { useWikidataReactions } from "../hooks/useWikidataReactions";
-import { useToggleWikidataReaction } from "../hooks/useToggleWikidataReaction";
-import { encodeNpub, normalizePubkey } from "../lib/nostr";
-import type { WikidataReactionItem } from "../hooks/useWikidataReactionsTimeline";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useNip07Auth } from "../hooks/useNip07Auth";
 import { useProfile } from "../hooks/useProfile";
-import { useRelayPool } from "../hooks/useRelayPool";
-import { useEventStore } from "../hooks/useEventStore";
-import { THINGSTR_RELAYS } from "../config/relays";
-import { stripWikidataPrefix } from "../lib/wikidata";
-import { useWikidataInstanceOf } from "../hooks/useWikidataInstanceOf";
-
-interface UserReactionEntryProps {
-	item: WikidataReactionItem;
-	summary?: EntitySummary;
-	isSummaryLoading: boolean;
-	canToggle: boolean;
-	classifications: { id: string; label: string | null }[];
-	isClassificationLoading: boolean;
-	onClassificationClick: (id: string) => void;
-	selectedClassification: string | null;
-}
-
-function UserReactionEntry({
-	item,
-	summary,
-	isSummaryLoading,
-	canToggle,
-	classifications,
-	isClassificationLoading,
-	onClassificationClick,
-	selectedClassification,
-}: UserReactionEntryProps) {
-	const { event, entityId } = item;
-	const { isStarred } = useWikidataReactions(entityId, {
-		pubkey: event.pubkey,
-	});
-	const { toggle, isSaving } = useToggleWikidataReaction({
-		entityId,
-		lastReactionEventId: event.id,
-	});
-	const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
-	const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-	const handleToggle = () => {
-		if (!canToggle) return;
-		void toggle(isStarred);
-	};
-
-	const labelClassName = summary?.label
-		? "text-base-content"
-		: "italic text-base-content/60";
-	const labelText = summary?.label ?? "No label defined";
-	const descriptionText = summary?.description;
-
-	return (
-		<div className="card bg-base-100 shadow-sm rounded-md">
-			<div className="card-body py-3 px-4">
-				<div className="flex gap-3 items-start">
-					<StarToggle
-						isStarred={isStarred}
-						isSaving={isSaving}
-						onToggle={handleToggle}
-						size={22}
-						confirmUnstarMessage="Remove your star from this thing?"
-						isReadOnly={!canToggle}
-					/>
-					<div className="flex flex-1 flex-col gap-2">
-						<div className="flex flex-wrap items-center gap-2">
-							{isSummaryLoading ? (
-								<div className="skeleton h-4 w-24" />
-							) : (
-								<Link
-									to="/things/$id"
-									params={{ id: entityId }}
-									className={`text-sm font-semibold transition-colors hover:text-primary ${labelClassName}`}
-								>
-									{labelText}
-								</Link>
-							)}
-							<IdBadge id={entityId} />
-						</div>
-						{isSummaryLoading ? (
-							<div className="skeleton h-3 w-36" />
-						) : descriptionText ? (
-							<p className="text-xs text-base-content/70">{descriptionText}</p>
-						) : (
-							<p className="text-xs italic text-base-content/60">
-								No description defined
-							</p>
-						)}
-						{isClassificationLoading ? (
-							<div className="flex flex-wrap gap-2">
-								<div className="skeleton h-5 w-16" />
-								<div className="skeleton h-5 w-16" />
-							</div>
-						) : classifications.length ? (
-							<div className="flex flex-wrap items-center gap-2 text-xs text-base-content/70">
-								<IconTags size={14} />
-								<div className="flex flex-wrap gap-2">
-									{classifications.map(({ id, label }) => (
-										<button
-											key={id}
-											type="button"
-											className={`px-2 py-1 rounded-md bg-base-200 text-base-content/80 hover:bg-base-300 transition-colors ${
-												selectedClassification === id ? "ring-2 ring-primary/60" : ""
-											}`}
-											onClick={() => onClassificationClick(id)}
-										>
-											{label ?? id}
-										</button>
-									))}
-								</div>
-							</div>
-						) : null}
-						<span className="text-xs text-base-content/60">
-							{new Date(event.created_at * 1000).toLocaleString()}
-						</span>
-					</div>
-					<details
-						className={`dropdown dropdown-end${isMenuOpen ? " dropdown-open" : ""}`}
-						open={isMenuOpen}
-						onToggle={(details) => setIsMenuOpen(details.currentTarget.open)}
-					>
-						<summary className="btn btn-ghost btn-sm btn-circle mt-1">
-							<IconDotsVertical size={18} />
-						</summary>
-						<ul className="menu menu-sm dropdown-content bg-base-100 rounded-box shadow right-0 mt-1 w-48 z-10">
-							<li>
-								<button
-									type="button"
-									onClick={() => {
-										setIsJsonModalOpen(true);
-										setIsMenuOpen(false);
-									}}
-								>
-									Show event JSON
-								</button>
-							</li>
-						</ul>
-					</details>
-				</div>
-			</div>
-			{isJsonModalOpen ? (
-				<div className="modal modal-open">
-					<div className="modal-box space-y-3 max-w-3xl">
-						<h3 className="font-semibold text-lg">Event JSON</h3>
-						<pre className="text-xs bg-base-200 rounded-md p-2 max-h-[60vh] overflow-auto whitespace-pre-wrap break-words">
-							{JSON.stringify(event, null, 2)}
-						</pre>
-						<div className="modal-action">
-							<button
-								type="button"
-								className="btn btn-primary"
-								onClick={() => setIsJsonModalOpen(false)}
-							>
-								Close
-							</button>
-						</div>
-					</div>
-					<div
-						className="modal-backdrop"
-						onClick={() => setIsJsonModalOpen(false)}
-						aria-hidden="true"
-					>
-						<button type="button" aria-label="Close" />
-					</div>
-				</div>
-			) : null}
-		</div>
-	);
-}
+import { useReactionClassifications } from "../hooks/useReactionClassifications";
+import { useUserReactionBackfill } from "../hooks/useUserReactionBackfill";
+import { useUserWikidataReactions } from "../hooks/useUserWikidataReactions";
+import { useWikidataEntitySummaries } from "../hooks/useWikidataEntitySummaries";
+import { encodeNpub, normalizePubkey } from "../lib/nostr";
+import UserClassifications from "./UserClassifications";
+import UserHeader from "./UserHeader";
+import UserReactionEntry from "./UserReactionEntry";
 
 interface UserPageProps {
 	npub: string;
 }
 
-const REACTION_PAGE_SIZE = 500;
-const MAX_REACTION_PAGES = 10;
-
 export default function UserPage({ npub }: UserPageProps) {
 	const normalizedPubkey = useMemo(() => normalizePubkey(npub), [npub]);
-	const { session } = useNip07Auth();
-	const viewerPubkey = session?.pubkey ? normalizePubkey(session.pubkey) : null;
+	const { pubkey: viewerPubkey } = useNip07Auth();
 	const isOwnPage =
-		Boolean(viewerPubkey) && Boolean(normalizedPubkey) && viewerPubkey === normalizedPubkey;
+		Boolean(viewerPubkey) &&
+		Boolean(normalizedPubkey) &&
+		viewerPubkey === normalizedPubkey;
 	const language = useBrowserLanguage();
 	const { name } = useProfile(normalizedPubkey);
 	const reactions = useUserWikidataReactions(normalizedPubkey);
-	const eventStore = useEventStore();
-	const relayPool = useRelayPool();
-	const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
-	const [showAllClassifications, setShowAllClassifications] = useState(false);
-	const uniqueReactions = useMemo(() => {
-		const seen = new Set<string>();
-		return reactions.filter((item) => {
-			if (seen.has(item.event.id)) return false;
-			seen.add(item.event.id);
-			return true;
-		});
-	}, [reactions]);
-	const entityIds = useMemo(
-		() => Array.from(new Set(uniqueReactions.map((item) => item.entityId))),
-		[uniqueReactions],
-	);
 	const {
-		instanceOf,
-		isLoading: isInstanceOfLoading,
-		error: instanceOfError,
-	} = useWikidataInstanceOf(entityIds);
-	const classificationIdsByEntityId = useMemo(() => {
-		const map: Record<string, string[]> = {};
-		entityIds.forEach((entityId) => {
-			const ids = instanceOf[entityId] ?? [];
-			if (ids.length) {
-				map[entityId] = ids.map(stripWikidataPrefix).filter(Boolean);
-			}
-		});
-		return map;
-	}, [entityIds, instanceOf]);
-
-	const classificationIds = useMemo(() => {
-		const ids = new Set<string>();
-		Object.values(classificationIdsByEntityId).forEach((list) => {
-			list.forEach((id) => ids.add(id));
-		});
-		return Array.from(ids);
-	}, [classificationIdsByEntityId]);
-
-	const filteredReactions = useMemo(() => {
-		if (!selectedClassification) return uniqueReactions;
-		return uniqueReactions.filter((item) =>
-			(classificationIdsByEntityId[item.entityId] ?? []).includes(
-				selectedClassification,
-			),
-		);
-	}, [classificationIdsByEntityId, selectedClassification, uniqueReactions]);
-
-	const classificationSummary = useMemo(() => {
-		const counts: Record<string, number> = {};
-		Object.values(classificationIdsByEntityId).forEach((ids) => {
-			ids.forEach((id) => {
-				counts[id] = (counts[id] ?? 0) + 1;
-			});
-		});
-		return Object.entries(counts)
-			.map(([id, count]) => ({ id, count }))
-			.sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
-	}, [classificationIdsByEntityId]);
-
-	const visibleClassificationSummary = useMemo(() => {
-		const limit = 7;
-		if (showAllClassifications) return classificationSummary;
-		const top = classificationSummary.slice(0, limit);
-		if (!selectedClassification) return top;
-		const alreadyVisible = top.some((item) => item.id === selectedClassification);
-		if (alreadyVisible) return top;
-		const selected = classificationSummary.find(
-			(item) => item.id === selectedClassification,
-		);
-		return selected ? [...top, selected] : top;
-	}, [classificationSummary, selectedClassification, showAllClassifications]);
-
+		uniqueReactions,
+		entityIds,
+		classificationIdsByEntityId,
+		classificationIds,
+		filteredReactions,
+		classificationSummary,
+		visibleClassificationSummary,
+		selectedClassification,
+		showAllClassifications,
+		isInstanceOfLoading,
+		instanceOfError,
+		selectClassification,
+		clearClassification,
+		toggleShowAllClassifications,
+	} = useReactionClassifications(reactions);
 	const { summaries, isLoading, error } = useWikidataEntitySummaries(
 		[...entityIds, ...classificationIds],
 		{
@@ -281,141 +51,10 @@ export default function UserPage({ npub }: UserPageProps) {
 	);
 
 	const displayNpub = normalizedPubkey ? encodeNpub(normalizedPubkey) : null;
-	const titleSubject = name ?? displayNpub ?? npub ?? null;
-	const isClassificationSectionVisible =
-		isInstanceOfLoading || classificationSummary.length > 0;
+	const titleSubject = name ?? displayNpub ?? npub;
+	useDocumentTitle(titleSubject);
 
-	useEffect(() => {
-		const baseTitle = "thingstr";
-		document.title = titleSubject ? `${titleSubject} | ${baseTitle}` : baseTitle;
-		return () => {
-			document.title = baseTitle;
-		};
-	}, [titleSubject]);
-
-	useEffect(() => {
-		if (!normalizedPubkey) return;
-		if (!THINGSTR_RELAYS.length) return;
-
-		const group = relayPool.group(THINGSTR_RELAYS);
-		let cancelCurrentRequest: (() => void) | null = null;
-		let cancelDeleteRequest: (() => void) | null = null;
-		let isCancelled = false;
-
-		type PageResult = {
-			earliestTimestamp: number | null;
-			reactionCount: number;
-		};
-
-		const loadPage = (until?: number): Promise<PageResult> =>
-			new Promise<PageResult>((resolve) => {
-				const filters = [
-					{
-						kinds: [17],
-						"#k": ["wikidata"],
-						authors: [normalizedPubkey],
-						limit: REACTION_PAGE_SIZE,
-						...(typeof until === "number" ? { until } : {}),
-					},
-				];
-
-				let earliestTimestamp: number | null = null;
-				let reactionCount = 0;
-				let isResolved = false;
-
-				const finish = (result: PageResult) => {
-					if (isResolved) return;
-					isResolved = true;
-					cancelCurrentRequest = null;
-					resolve(result);
-				};
-
-				const subscription = group.request(filters, { eventStore }).subscribe({
-					next: (event) => {
-						if (!event || typeof event === "string") return;
-						const typedEvent = event as { created_at?: number; kind?: number };
-						if (typedEvent.kind === 17) reactionCount += 1;
-						if (typeof typedEvent.created_at === "number") {
-							earliestTimestamp =
-								earliestTimestamp === null
-									? typedEvent.created_at
-									: Math.min(earliestTimestamp, typedEvent.created_at);
-						}
-						eventStore.add(event as never);
-					},
-					error: (error) => {
-						console.error("Failed to load user reactions", error);
-						finish({
-							earliestTimestamp: null,
-							reactionCount: 0,
-						});
-					},
-					complete: () => finish({ earliestTimestamp, reactionCount }),
-				});
-
-				cancelCurrentRequest = () => {
-					subscription.unsubscribe();
-					finish({
-						earliestTimestamp: null,
-						reactionCount: 0,
-					});
-					cancelCurrentRequest = null;
-				};
-			});
-
-		const loadDeletes = () =>
-			new Promise<void>((resolve) => {
-				const deleteFilters = [
-					{
-						kinds: [5],
-						authors: [normalizedPubkey],
-						limit: REACTION_PAGE_SIZE,
-					},
-				];
-
-				const subscription = group
-					.request(deleteFilters, { eventStore })
-					.subscribe({
-						next: (event) => {
-							if (!event || typeof event === "string") return;
-							eventStore.add(event as never);
-						},
-						error: (error) => {
-							console.error("Failed to load delete events", error);
-							resolve();
-						},
-						complete: () => resolve(),
-					});
-
-				cancelDeleteRequest = () => {
-					subscription.unsubscribe();
-					cancelDeleteRequest = null;
-					resolve();
-				};
-			});
-
-		void (async () => {
-			await loadDeletes();
-			let until: number | undefined;
-			for (let page = 0; page < MAX_REACTION_PAGES; page += 1) {
-				if (isCancelled) break;
-				const { earliestTimestamp, reactionCount } = await loadPage(until);
-				if (isCancelled) break;
-				if (earliestTimestamp === null) break;
-
-				const nextUntil = earliestTimestamp - 1;
-				if (until !== undefined && nextUntil >= until) break;
-				if (reactionCount < REACTION_PAGE_SIZE) break;
-				until = nextUntil;
-			}
-		})();
-
-		return () => {
-			isCancelled = true;
-			cancelCurrentRequest?.();
-			cancelDeleteRequest?.();
-		};
-	}, [eventStore, normalizedPubkey, relayPool]);
+	useUserReactionBackfill(normalizedPubkey);
 
 	if (!normalizedPubkey) {
 		return (
@@ -453,9 +92,7 @@ export default function UserPage({ npub }: UserPageProps) {
 								(id) => !summaries[id],
 							))
 					}
-					onClassificationClick={(id) =>
-						setSelectedClassification((prev) => (prev === id ? null : id))
-					}
+					onClassificationClick={selectClassification}
 					selectedClassification={selectedClassification}
 				/>
 			))}
@@ -479,80 +116,18 @@ export default function UserPage({ npub }: UserPageProps) {
 				</div>
 			</div>
 
-			{isClassificationSectionVisible ? (
-				<div className="space-y-2">
-					<div className="flex items-center gap-2 text-base font-semibold">
-						<IconTags size={18} /> Classifications
-					</div>
-					<div className="card bg-base-100 shadow-sm rounded-md">
-						<div className="card-body py-4 space-y-3">
-							{selectedClassification ? (
-								<div className="flex items-center gap-2 text-xs text-base-content/70">
-									<span>Filtering by</span>
-									<span className="px-2 py-1 rounded-md bg-base-200 text-base-content/80">
-										{summaries[selectedClassification]?.label ?? selectedClassification}
-									</span>
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs"
-										onClick={() => setSelectedClassification(null)}
-									>
-										Clear
-									</button>
-								</div>
-							) : null}
-							{instanceOfError ? (
-								<div className="text-sm text-error">{instanceOfError}</div>
-							) : null}
-							{isInstanceOfLoading ? (
-								<div className="flex flex-wrap gap-2">
-									<div className="skeleton h-8 w-24" />
-									<div className="skeleton h-8 w-24" />
-									<div className="skeleton h-8 w-20" />
-								</div>
-							) : classificationSummary.length ? (
-								<>
-									<div className="flex flex-wrap gap-2">
-										{visibleClassificationSummary.map(({ id, count }) => (
-											<button
-												key={id}
-												className={`px-3 py-2 rounded-md bg-base-200 text-sm text-base-content/80 inline-flex items-center gap-2 cursor-pointer hover:bg-base-300 transition-colors ${
-													selectedClassification === id ? "ring-2 ring-primary/60" : ""
-												}`}
-												onClick={() =>
-													setSelectedClassification((prev) =>
-														prev === id ? null : id,
-													)
-												}
-											>
-												<span className="font-medium">
-													{summaries[id]?.label ?? id}
-												</span>
-												<span className="text-xs px-2 py-0.5 rounded bg-base-300 text-base-content/80">
-													{count}
-												</span>
-											</button>
-										))}
-									</div>
-									{classificationSummary.length > 7 ? (
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs"
-											onClick={() => setShowAllClassifications((prev) => !prev)}
-										>
-											{showAllClassifications ? "Show less" : "Show all"}
-										</button>
-									) : null}
-								</>
-							) : (
-								<p className="text-sm text-base-content/60">
-									No classifications yet
-								</p>
-							)}
-						</div>
-					</div>
-				</div>
-			) : null}
+			<UserClassifications
+				classificationSummary={classificationSummary}
+				visibleClassificationSummary={visibleClassificationSummary}
+				summaries={summaries}
+				isLoading={isInstanceOfLoading}
+				error={instanceOfError}
+				selectedClassification={selectedClassification}
+				showAllClassifications={showAllClassifications}
+				onClassificationClick={selectClassification}
+				onClearClassification={clearClassification}
+				onToggleShowAll={toggleShowAllClassifications}
+			/>
 
 			<div className="space-y-3">
 				<div className="flex items-center gap-2 text-base font-semibold">

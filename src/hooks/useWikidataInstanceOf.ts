@@ -1,22 +1,16 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-
-const ENDPOINT = "https://www.wikidata.org/w/api.php";
-
-interface WikidataSnak {
-	snaktype: string;
-	datavalue?: {
-		type: string;
-		value: unknown;
-	};
-}
+import { useMemo } from "react";
+import {
+	fetchWikidataEntities,
+	normalizeEntityIds,
+} from "../lib/wikidata/api";
+import {
+	isWikibaseEntityValue,
+	type WikidataClaim,
+} from "../lib/wikidata/claims";
 
 interface WikidataEntity {
-	claims?: Record<string, { mainsnak: WikidataSnak }[]>;
-}
-
-interface WikidataEntityResponse {
-	entities: Record<string, WikidataEntity>;
+	claims?: Record<string, WikidataClaim[]>;
 }
 
 const CLASSIFICATION_PROPERTIES = ["P31", "P279"] as const;
@@ -28,14 +22,7 @@ export interface WikidataInstanceOfResult {
 }
 
 export function useWikidataInstanceOf(ids: string[]): WikidataInstanceOfResult {
-	const normalizedIds = useMemo(
-		() =>
-			Array.from(
-				new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0)),
-			).sort(),
-		[ids],
-	);
-
+	const normalizedIds = useMemo(() => normalizeEntityIds(ids), [ids]);
 	const queryKey = useMemo(
 		() => ["wikidata-instanceof", normalizedIds] as const,
 		[normalizedIds],
@@ -53,45 +40,28 @@ export function useWikidataInstanceOf(ids: string[]): WikidataInstanceOfResult {
 			const [, entityIds] = key;
 			if (!entityIds.length) return {};
 
-			const chunks: string[][] = [];
-			for (let i = 0; i < entityIds.length; i += 50) {
-				chunks.push(entityIds.slice(i, i + 50));
-			}
-
+			const entities = await fetchWikidataEntities<WikidataEntity>(entityIds, {
+				props: "claims",
+				errorMessage: "Failed to load entity claims",
+				signal,
+			});
 			const map: Record<string, string[]> = {};
 
-			for (const chunk of chunks) {
-				const params = new URLSearchParams({
-					action: "wbgetentities",
-					format: "json",
-					ids: chunk.join("|"),
-					origin: "*",
-					props: "claims",
-				});
-
-				const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
-					signal,
-				});
-
-				if (!response.ok) {
-					throw new Error("Failed to load entity claims");
+			for (const entityId of entityIds) {
+				const classificationIds = new Set<string>();
+				for (const property of CLASSIFICATION_PROPERTIES) {
+					const claims = entities[entityId]?.claims?.[property] ?? [];
+					for (const claim of claims) {
+						const value = claim.mainsnak.datavalue;
+						if (
+							value?.type === "wikibase-entityid" &&
+							isWikibaseEntityValue(value.value)
+						) {
+							classificationIds.add(value.value.id);
+						}
+					}
 				}
-
-				const data = (await response.json()) as WikidataEntityResponse;
-				for (const entityId of chunk) {
-					const entity = data.entities?.[entityId];
-					const ids = new Set<string>();
-					CLASSIFICATION_PROPERTIES.forEach((property) => {
-						const claims = entity?.claims?.[property] ?? [];
-						claims.forEach((claim) => {
-							const value = claim.mainsnak.datavalue;
-							if (value?.type !== "wikibase-entityid") return;
-							if (!isWikibaseEntityValue(value.value)) return;
-							ids.add(value.value.id);
-						});
-					});
-					map[entityId] = Array.from(ids);
-				}
+				map[entityId] = Array.from(classificationIds);
 			}
 
 			return map;
@@ -113,15 +83,4 @@ export function useWikidataInstanceOf(ids: string[]): WikidataInstanceOfResult {
 		isLoading,
 		error,
 	};
-}
-
-function isWikibaseEntityValue(
-	value: unknown,
-): value is { id: string; "entity-type": string } {
-	return Boolean(
-		value &&
-			typeof value === "object" &&
-			"id" in value &&
-			typeof (value as { id?: unknown }).id === "string",
-	);
 }

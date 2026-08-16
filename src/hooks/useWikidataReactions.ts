@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useProfile } from "./useProfile";
 import { useEventStore } from "./useEventStore";
 import { useNip07Auth } from "./useNip07Auth";
-import { withWikidataPrefix } from "../lib/wikidata";
+import { withWikidataPrefix } from "../lib/wikidata/ids";
 
 interface UseWikidataReactionsResult {
 	isStarred: boolean;
-	pubkey: string | null;
 	lastReactionEventId: string | null;
-	profilePicture: string | null;
 }
 
 type UseWikidataReactionsOptions = {
@@ -27,8 +24,8 @@ export function useWikidataReactions(
 	{ pubkey: targetPubkey }: UseWikidataReactionsOptions = {},
 ): UseWikidataReactionsResult {
 	const eventStore = useEventStore();
-	const { session } = useNip07Auth();
-	const pubkeyToTrack = targetPubkey ?? session?.pubkey ?? null;
+	const { pubkey } = useNip07Auth();
+	const pubkeyToTrack = targetPubkey ?? pubkey;
 	const prefixedEntityId = useMemo(
 		() => withWikidataPrefix(entityId),
 		[entityId],
@@ -43,17 +40,13 @@ export function useWikidataReactions(
 		[prefixedEntityId, pubkeyToTrack],
 	);
 
-	const [pubkey, setPubkey] = useState<string | null>(null);
 	const [lastReactionEventId, setLastReactionEventId] = useState<string | null>(
 		null,
 	);
 	const [isStarred, setIsStarred] = useState(false);
 	const [reactionIds, setReactionIds] = useState<Set<string>>(new Set());
 
-	const { picture: profilePicture } = useProfile(pubkey);
-
 	useEffect(() => {
-		setPubkey(null);
 		setLastReactionEventId(null);
 		setIsStarred(false);
 		setReactionIds(new Set());
@@ -77,7 +70,6 @@ export function useWikidataReactions(
 					if (ev.id) ids.add(ev.id);
 				});
 				setReactionIds(ids);
-				setPubkey(latest.pubkey ?? null);
 				setLastReactionEventId(latest.id ?? null);
 				setIsStarred(true);
 			}
@@ -85,7 +77,6 @@ export function useWikidataReactions(
 
 		const sub = eventStore.filters(filter).subscribe((event) => {
 			if (event?.pubkey !== pubkeyToTrack) return;
-			setPubkey(event.pubkey);
 			setLastReactionEventId(event.id ?? null);
 			setIsStarred(true);
 			if (event.id) {
@@ -113,7 +104,6 @@ export function useWikidataReactions(
 				});
 				if (lastReactionEventId === deletedId) {
 					setIsStarred(false);
-					setPubkey(null);
 					setLastReactionEventId(null);
 				}
 			}
@@ -123,5 +113,5 @@ export function useWikidataReactions(
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [eventStore, lastReactionEventId]);
 
-	return { isStarred, pubkey, lastReactionEventId, profilePicture };
+	return { isStarred, lastReactionEventId };
 }

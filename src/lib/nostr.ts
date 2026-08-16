@@ -33,8 +33,3 @@ export function encodeNpub(pubkey: string): string | null {
 		return null;
 	}
 }
-
-export function formatShortPubkey(pubkey: string): string {
-	if (pubkey.length <= 16) return pubkey;
-	return `${pubkey.slice(0, 8)}...${pubkey.slice(-4)}`;
-}

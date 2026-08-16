@@ -15,7 +15,7 @@ import StarToggle from "./StarToggle";
 import { THINGSTR_RELAYS } from "../config/relays";
 import { useRelayPool } from "../hooks/useRelayPool";
 import { useEventStore } from "../hooks/useEventStore";
-import { withWikidataPrefix } from "../lib/wikidata";
+import { withWikidataPrefix } from "../lib/wikidata/ids";
 
 const MAX_ENTITIES = 200;
 
@@ -57,7 +57,11 @@ export default function WikidataReactionsList() {
 		});
 
 		return Array.from(map.values())
-			.map(({ seen: _seen, ...rest }) => rest)
+			.map(({ entityId, latestAt, reactions }) => ({
+				entityId,
+				latestAt,
+				reactions,
+			}))
 			.sort((a, b) => (b.latestAt ?? 0) - (a.latestAt ?? 0))
 			.slice(0, MAX_ENTITIES);
 	}, [reactions]);
@@ -119,17 +123,13 @@ function GroupedReactionCard({
 	const hasBackfilledRef = useRef(false);
 	const relayPool = useRelayPool();
 	const eventStore = useEventStore();
-	const { session } = useNip07Auth();
+	const { pubkey: viewerPubkey } = useNip07Auth();
 	const { isStarred, lastReactionEventId } = useWikidataReactions(entityId);
 	const { toggle, isSaving } = useToggleWikidataReaction({
 		entityId,
 		lastReactionEventId,
 	});
-	const isLoggedIn = Boolean(session?.pubkey);
-	const viewerPubkey = useMemo(
-		() => (session?.pubkey ? normalizePubkey(session.pubkey) : null),
-		[session?.pubkey],
-	);
+	const isLoggedIn = Boolean(viewerPubkey);
 	const prefixedEntityId = useMemo(
 		() => withWikidataPrefix(entityId),
 		[entityId],
@@ -166,20 +166,16 @@ function GroupedReactionCard({
 					},
 				];
 				const group = relayPool.group(THINGSTR_RELAYS);
-				backfillSubRef.current = group.request(filters, { eventStore }).subscribe(
-					{
-						next: (event) => {
-							if (!event || typeof event === "string") return;
-							eventStore.add(event as never);
-						},
+				backfillSubRef.current = group
+					.request(filters, { eventStore })
+					.subscribe({
 						error: (error) => {
 							console.error(
 								`Failed to backfill reactions for entity ${entityId}`,
 								error,
 							);
 						},
-					},
-				);
+					});
 				observer.disconnect();
 			});
 		});

@@ -12,11 +12,7 @@ export default function ReactionAvatarList({
 	reactions,
 }: ReactionAvatarListProps) {
 	const followers = useFollowers();
-	const { session } = useNip07Auth();
-	const viewerPubkey = useMemo(
-		() => (session?.pubkey ? normalizePubkey(session.pubkey) : null),
-		[session?.pubkey],
-	);
+	const { pubkey: viewerPubkey } = useNip07Auth();
 
 	const reactionWithFollowerFlag = useMemo(
 		() =>

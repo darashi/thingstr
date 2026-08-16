@@ -9,14 +9,14 @@ import ReactionAvatarList from "./ReactionAvatarList";
 import { useEventStore } from "../hooks/useEventStore";
 import { useRelayPool } from "../hooks/useRelayPool";
 import { THINGSTR_RELAYS } from "../config/relays";
-import { withWikidataPrefix } from "../lib/wikidata";
+import { withWikidataPrefix } from "../lib/wikidata/ids";
 
 interface ReactionsCardProps {
 	entityId: string;
 }
 
 export default function ReactionsCard({ entityId }: ReactionsCardProps) {
-	const { session } = useNip07Auth();
+	const { pubkey: viewerPubkey } = useNip07Auth();
 	const { isStarred, lastReactionEventId } = useWikidataReactions(entityId);
 	const { toggle, isSaving } = useToggleWikidataReaction({
 		entityId,
@@ -25,11 +25,7 @@ export default function ReactionsCard({ entityId }: ReactionsCardProps) {
 	const reactions = useWikidataReactionsTimeline();
 	const eventStore = useEventStore();
 	const relayPool = useRelayPool();
-	const isLoggedIn = Boolean(session?.pubkey);
-	const viewerPubkey = useMemo(
-		() => (session?.pubkey ? normalizePubkey(session.pubkey) : null),
-		[session?.pubkey],
-	);
+	const isLoggedIn = Boolean(viewerPubkey);
 	const prefixedEntityId = useMemo(
 		() => withWikidataPrefix(entityId),
 		[entityId],
@@ -49,15 +45,13 @@ export default function ReactionsCard({ entityId }: ReactionsCardProps) {
 		];
 
 		const group = relayPool.group(THINGSTR_RELAYS);
-		const sub = group.request(filters, { eventStore }).subscribe({
-			next: (event) => {
-				if (!event || typeof event === "string") return;
-				eventStore.add(event as never);
-			},
-			error: (error) => {
-				console.error("Failed to request reactions for entity", error);
-			},
-		});
+		const sub = group
+			.request(filters, { eventStore })
+			.subscribe({
+				error: (error) => {
+					console.error("Failed to request reactions for entity", error);
+				},
+			});
 
 		return () => sub.unsubscribe();
 	}, [entityId, eventStore, prefixedEntityId, relayPool]);

@@ -16,15 +16,9 @@ export function useThingstrReactionsSubscription() {
 		if (!THINGSTR_RELAYS.length) return;
 
 		const group = relayPool.group(THINGSTR_RELAYS);
-		const handleEvent = (event: unknown) => {
-			if (!event || typeof event === "string") return;
-			eventStore.add(event as never);
-		};
-
 		const requestSub = group
 			.request(REACTION_FILTERS, { eventStore })
 			.subscribe({
-				next: handleEvent,
 				error: (error) =>
 					console.error(
 						"Failed to request reactions from THINGSTR relays",
@@ -35,7 +29,6 @@ export function useThingstrReactionsSubscription() {
 		const liveSub = group
 			.subscription(REACTION_FILTERS, { eventStore })
 			.subscribe({
-				next: handleEvent,
 				error: (error) =>
 					console.error(
 						"Failed to subscribe to reactions from THINGSTR relays",

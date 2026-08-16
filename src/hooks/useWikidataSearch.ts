@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { fetchWikidata } from "../lib/wikidata/api";
 
 export interface WikidataSearchResult {
 	id: string;
@@ -16,8 +17,6 @@ interface UseWikidataSearchOptions {
 	language?: string;
 }
 
-const ENDPOINT = "https://www.wikidata.org/w/api.php";
-
 export function useWikidataSearch(
 	query: string,
 	options: UseWikidataSearchOptions = {},
@@ -30,26 +29,17 @@ export function useWikidataSearch(
 		enabled: Boolean(trimmedQuery),
 		queryFn: async ({ queryKey, signal }) => {
 			const [, searchTerm, languageCode] = queryKey;
-
-			const params = new URLSearchParams({
-				action: "wbsearchentities",
-				format: "json",
-				origin: "*",
-				language: languageCode,
-				uselang: languageCode,
-				search: searchTerm,
-				limit: "50",
-			});
-
-			const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
+			const data = await fetchWikidata<WikidataSearchResponse>(
+				"wbsearchentities",
+				{
+					language: languageCode,
+					uselang: languageCode,
+					search: searchTerm,
+					limit: "50",
+				},
+				"Failed to search Wikidata",
 				signal,
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to search Wikidata");
-			}
-
-			const data = (await response.json()) as WikidataSearchResponse;
+			);
 			return data.search ?? [];
 		},
 	});

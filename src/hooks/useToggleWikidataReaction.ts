@@ -4,9 +4,9 @@ import { useNip07Auth } from "./useNip07Auth";
 import { useEventStore } from "./useEventStore";
 import { useRelayPool } from "./useRelayPool";
 import { THINGSTR_RELAYS } from "../config/relays";
-import { withWikidataPrefix } from "../lib/wikidata";
+import { withWikidataPrefix } from "../lib/wikidata/ids";
 
-type StarEventTemplate = {
+type Nip07EventTemplate = {
 	kind: number;
 	content: string;
 	tags: string[][];
@@ -16,109 +16,76 @@ type StarEventTemplate = {
 interface UseToggleWikidataReactionOptions {
 	entityId: string;
 	lastReactionEventId: string | null;
-	onStar?: (eventId: string | null, pubkey: string | null) => void;
-	onUnstar?: () => void;
 }
 
 export function useToggleWikidataReaction({
 	entityId,
 	lastReactionEventId,
-	onStar,
-	onUnstar,
 }: UseToggleWikidataReactionOptions) {
 	const eventStore = useEventStore();
 	const relayPool = useRelayPool();
-	const { session } = useNip07Auth();
+	const { pubkey } = useNip07Auth();
 	const [isSaving, setIsSaving] = useState(false);
 
-	const createReactionEvent = useCallback(async () => {
-		if (!session?.pubkey) {
-			return null;
-		}
-
-		if (!window.nostr?.getPublicKey || !window.nostr?.signEvent) {
-			window.alert("NIP-07 signer not found.");
-			return null;
-		}
-
-		const factory = new EventFactory();
-		factory.setSigner({
-			getPublicKey: () => window.nostr!.getPublicKey!(),
-			signEvent: (template: StarEventTemplate) => window.nostr!.signEvent!(template),
-		} as never);
-
-		const draft = await factory.build({
-			kind: 17,
-			content: "+",
-			tags: [
-				["k", "wikidata"],
-				["i", withWikidataPrefix(entityId)],
-			],
-		});
-
-		const signed = await factory.sign(draft);
-		eventStore.add(signed);
-		try {
-			if (THINGSTR_RELAYS.length) {
-				await relayPool.publish(THINGSTR_RELAYS, signed);
+	const createAndPublishEvent = useCallback(
+		async (template: Nip07EventTemplate, publishErrorMessage: string) => {
+			if (!window.nostr?.getPublicKey || !window.nostr?.signEvent) {
+				window.alert("NIP-07 signer not found.");
+				return null;
 			}
-		} catch (error) {
-			console.error("Failed to publish reaction", error);
-		}
-		onStar?.(signed.id ?? null, signed.pubkey ?? null);
-		return signed;
-	}, [entityId, eventStore, onStar, relayPool, session?.pubkey]);
 
-	const createDeleteEvent = useCallback(async () => {
-		if (!session?.pubkey) {
-			return null;
-		}
+			const factory = new EventFactory();
+			factory.setSigner({
+				getPublicKey: () => window.nostr!.getPublicKey!(),
+				signEvent: (eventTemplate: Nip07EventTemplate) =>
+					window.nostr!.signEvent!(eventTemplate),
+			} as never);
 
-		if (!window.nostr?.getPublicKey || !window.nostr?.signEvent) {
-			window.alert("NIP-07 signer not found.");
-			return null;
-		}
-
-		if (!lastReactionEventId) return null;
-
-		const factory = new EventFactory();
-		factory.setSigner({
-			getPublicKey: () => window.nostr!.getPublicKey!(),
-			signEvent: (template: StarEventTemplate) => window.nostr!.signEvent!(template),
-		} as never);
-
-		const draft = await factory.build({
-			kind: 5,
-			content: "",
-			tags: [["e", lastReactionEventId]],
-		});
-
-		const signed = await factory.sign(draft);
-		eventStore.add(signed);
-		try {
-			if (THINGSTR_RELAYS.length) {
-				await relayPool.publish(THINGSTR_RELAYS, signed);
+			const draft = await factory.build(template);
+			const signed = await factory.sign(draft);
+			eventStore.add(signed);
+			try {
+				if (THINGSTR_RELAYS.length) {
+					await relayPool.publish(THINGSTR_RELAYS, signed);
+				}
+			} catch (error) {
+				console.error(publishErrorMessage, error);
 			}
-		} catch (error) {
-			console.error("Failed to publish deletion", error);
-		}
-		onUnstar?.();
-		return signed;
-	}, [eventStore, lastReactionEventId, onUnstar, relayPool, session?.pubkey]);
+			return signed;
+		},
+		[eventStore, relayPool],
+	);
 
 	const toggle = useCallback(
 		async (isStarred: boolean) => {
-			if (!session?.pubkey) {
-				return;
-			}
+			if (!pubkey) return;
 			if (isSaving) return;
+
+			let eventTemplate: Nip07EventTemplate;
+			let publishErrorMessage: string;
+			if (isStarred) {
+				if (!lastReactionEventId) return;
+				eventTemplate = {
+					kind: 5,
+					content: "",
+					tags: [["e", lastReactionEventId]],
+				};
+				publishErrorMessage = "Failed to publish deletion";
+			} else {
+				eventTemplate = {
+					kind: 17,
+					content: "+",
+					tags: [
+						["k", "wikidata"],
+						["i", withWikidataPrefix(entityId)],
+					],
+				};
+				publishErrorMessage = "Failed to publish reaction";
+			}
+
 			setIsSaving(true);
 			try {
-				if (isStarred) {
-					await createDeleteEvent();
-				} else {
-					await createReactionEvent();
-				}
+				await createAndPublishEvent(eventTemplate, publishErrorMessage);
 			} catch (error) {
 				console.error("Failed to toggle reaction", error);
 				window.alert("Failed to toggle reaction.");
@@ -126,7 +93,13 @@ export function useToggleWikidataReaction({
 				setIsSaving(false);
 			}
 		},
-		[createDeleteEvent, createReactionEvent, isSaving, session?.pubkey],
+		[
+			createAndPublishEvent,
+			entityId,
+			isSaving,
+			lastReactionEventId,
+			pubkey,
+		],
 	);
 
 	return { toggle, isSaving };
